@@ -18,7 +18,6 @@ inline float4x4 sq(float4x4 const x) {
 	return float4x4(x[0]*x[0], x[1]*x[1], x[2]*x[2], x[3]*x[3]);
 }
 inline float4x4 sup(float4x4 w, float e) {
-	//	return float4x4(max(w[0],e), max(w[1],e), max(w[2],e), max(w[3],e));
 	return float4x4(w[0]+e, w[1]+e, w[2]+e, w[3]+e);
 }
 inline float4x4 rsqrt(float4x4 const x) {
@@ -43,6 +42,6 @@ kernel void AdamOptimize(device float4x4 * const theta [[ buffer(0) ]],
 	p.v[0] = mix(g, p.v[0], beta);
 	p.v[1] = mix(sq(g), p.v[1], gamma);
 	
-	theta[n] += alpha * mul(p.v[1], rsqrt(sup(p.v[1], epsilon)));
+	theta[n] += alpha * mul(p.v[0], rsqrt(sup(p.v[1], epsilon)));
 	parameters[n] = p;
 }

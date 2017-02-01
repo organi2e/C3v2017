@@ -95,7 +95,7 @@ class OptimizerTests: XCTestCase {
 		optimizerTests(factory: Adam.factory())
 	}
 	func testMomentum() {
-		optimizerTests(factory: Momentum.factory(η: 1e-6, γ: 0.9))
+		optimizerTests(factory: Momentum.factory(η: 1e-3, γ: 0.9))
 	}
 	func testStochasticGradientDescent() {
 		optimizerTests(factory: StochasticGradientDescent.factory(η: 1e-3))

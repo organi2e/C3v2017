@@ -19,14 +19,13 @@ public class Momentum {
 		pipeline = state
 		parameters = state.device.makeBuffer(length: 16*groups.width*MemoryLayout<Float>.size, options: .storageModePrivate)
 	}
-	public static func factory(η: Float = 1e-2, γ: Float = 0.9) -> (MTLDevice) throws -> (Int) -> Optimizer {
+	public static func factory(η: Float = 1e-3, γ: Float = 0.9) -> (MTLDevice) throws -> (Int) -> Optimizer {
 		let bundle: Bundle = Bundle(for: self)
 		let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
 		constantValues.setConstantValue([η], type: .float, withName: "eta")
 		constantValues.setConstantValue([γ], type: .float, withName: "gamma")
 		return {
 			let library: MTLLibrary = try $0.makeDefaultLibrary(bundle: bundle)
-			let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
 			let function: MTLFunction = try library.makeFunction(name: "MomentumOptimize", constantValues: constantValues)
 			let pipeline: MTLComputePipelineState = try $0.makeComputePipelineState(function: function)
 			return {

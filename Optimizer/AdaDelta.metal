@@ -16,7 +16,6 @@ inline float4x4 sq(float4x4 const x) {
 	return float4x4(x[0]*x[0], x[1]*x[1], x[2]*x[2], x[3]*x[3]);
 }
 inline float4x4 sup(float4x4 w, float e) {
-	//	return float4x4(max(w[0],e), max(w[1],e), max(w[2],e), max(w[3],e));
 	return float4x4(w[0]+e, w[1]+e, w[2]+e, w[3]+e);
 }
 inline float4x4 sqrt(float4x4 const x) {

@@ -20,11 +20,12 @@ public class MomentumAdaDelta {
 		parameters = state.device.makeBuffer(length: 64*groups.width, options: .storageModePrivate)
 	}
 	public static func factory(ρ: Float = 1023/1024.0, ε: Float = 1) -> (MTLDevice) throws -> (Int) -> Optimizer {
+		let bundle: Bundle = Bundle(for: self)
 		let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
 		constantValues.setConstantValue([ρ], type: .float, withName: "rho")
 		constantValues.setConstantValue([ε], type: .float, withName: "epsilon")
 		return {
-			let library: MTLLibrary = try $0.makeDefaultLibrary(bundle: Bundle(for: self))
+			let library: MTLLibrary = try $0.makeDefaultLibrary(bundle: bundle)
 			let function: MTLFunction = try library.makeFunction(name: "MomentumAdaDeltaOptimize", constantValues: constantValues)
 			let pipeline: MTLComputePipelineState = try $0.makeComputePipelineState(function: function)
 			return {

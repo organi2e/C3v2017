@@ -14,7 +14,7 @@ import Optimizer
 public class Context: NSManagedObjectContext {
 	let computer: Computer
 	let gauss: Gauss
-	let optimizerFactory: (Device, Int) throws -> Optimizer
+	let optimizerFactory: (Int) -> Optimizer
 	enum ErrorCases: Error, CustomStringConvertible {
 		case InvalidContext
 		case InvalidEntity(name: String)
@@ -37,6 +37,7 @@ public class Context: NSManagedObjectContext {
 		guard let device: MTLDevice = device ?? MTLCreateSystemDefaultDevice() else { throw ErrorCases.NoDeviceFound }
 		computer = try Computer(device: device)
 		gauss = try Gauss(device: device)
+		optimizerFactory = try SGD.factory()(computer.device)
 		super.init(concurrencyType: concurrencyType)
 		guard let model: NSManagedObjectModel = NSManagedObjectModel.mergedModel(from: [Bundle(for: type(of: self))]) else { throw ErrorCases.NoModelFound }
 		let store: NSPersistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
@@ -48,7 +49,7 @@ public class Context: NSManagedObjectContext {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { fatalError(ErrorCases.NoDeviceFound.description) }
 		computer = try!Computer(device: device)
 		gauss = try!Gauss(device: device)
-		optimizer = SGD(η: 0.5)
+		optimizerFactory = try!SGD.factory()(computer.device)
 		super.init(coder: aDecoder)
 	}
 	public override func encode(with aCoder: NSCoder) {
@@ -77,7 +78,7 @@ extension Context {
 }
 extension Context {
 	internal func make(count: Int) -> Optimizer {
-		return (try?SGD(device: computer.device, η: 1e-3)) ?? SGD(η: 1e-3)
+		return optimizerFactory(count)
 	}
 	internal func make(data: Data, options: ResourceOptions = []) -> Buffer {
 		return computer.make(data: data, options: options)

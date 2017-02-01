@@ -33,11 +33,12 @@ public class StochasticGradientDescent {
 			encoder.endEncoding()
 		}
 	}
-	public static func factory(η: Float) -> (MTLDevice) throws -> (Int) -> Optimizer {
+	public static func factory(η: Float = 1e-3) -> (MTLDevice) throws -> (Int) -> Optimizer {
+		let bundle: Bundle = Bundle(for: self)
 		let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
 		constantValues.setConstantValue([η], type: .float, withName: "eta")
 		return {
-			let library: MTLLibrary = try $0.makeDefaultLibrary(bundle: Bundle(for: self))
+			let library: MTLLibrary = try $0.makeDefaultLibrary(bundle: bundle)
 			let function: MTLFunction = try library.makeFunction(name: "StochasticGradientDescentOptimize", constantValues: constantValues)
 			let pipeline: MTLComputePipelineState = try $0.makeComputePipelineState(function: function)
 			return {
