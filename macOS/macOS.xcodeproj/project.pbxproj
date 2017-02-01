@@ -263,12 +263,12 @@
 		875931541E3B5BA8006B60FF /* Optimizer */ = {
 			isa = PBXGroup;
 			children = (
-				8759316A1E3B5BC9006B60FF /* AdaDelta.metal */,
 				8759316B1E3B5BC9006B60FF /* AdaDelta.swift */,
-				8759316C1E3B5BC9006B60FF /* Momentum.metal */,
+				8759316A1E3B5BC9006B60FF /* AdaDelta.metal */,
 				8759316D1E3B5BC9006B60FF /* Momentum.swift */,
-				8759316E1E3B5BC9006B60FF /* MomentumAdaDelta.metal */,
+				8759316C1E3B5BC9006B60FF /* Momentum.metal */,
 				8759316F1E3B5BC9006B60FF /* MomentumAdaDelta.swift */,
+				8759316E1E3B5BC9006B60FF /* MomentumAdaDelta.metal */,
 				875931711E3B5BC9006B60FF /* StochasticGradientDescent.metal */,
 				875931721E3B5BC9006B60FF /* StochasticGradientDescent.swift */,
 				875931701E3B5BC9006B60FF /* Optimizer.swift */,

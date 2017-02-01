@@ -1,14 +1,14 @@
 //
-//  MomentumAdaDelta.swift
+//  Adam.swift
 //  tvOS
 //
-//  Created by Kota Nakano on 2017/01/26.
+//  Created by Kota Nakano on 2017/02/01.
 //
 //
 
 import Metal
 
-public class AdaDelta {
+public class Adam {
 	let pipeline: MTLComputePipelineState
 	let parameters: MTLBuffer
 	let groups: MTLSize
@@ -19,22 +19,24 @@ public class AdaDelta {
 		pipeline = state
 		parameters = state.device.makeBuffer(length: 32*groups.width, options: .storageModePrivate)
 	}
-	public static func factory(ρ: Float = 0.95, ε: Float = 1e-6) -> (MTLDevice) throws -> (Int) -> Optimizer {
+	public static func factory(α: Float = 1e-3, β: Float = 0.9, γ: Float = 0.999, ε: Float = 1e-8) -> (MTLDevice) throws -> (Int) -> Optimizer {
 		let bundle: Bundle = Bundle(for: self)
 		let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
-		constantValues.setConstantValue([ρ], type: .float, withName: "rho")
+		constantValues.setConstantValue([α], type: .float, withName: "alpha")
+		constantValues.setConstantValue([β], type: .float, withName: "beta")
+		constantValues.setConstantValue([γ], type: .float, withName: "gamma")
 		constantValues.setConstantValue([ε], type: .float, withName: "epsilon")
 		return {
 			let library: MTLLibrary = try $0.makeDefaultLibrary(bundle: bundle)
-			let function: MTLFunction = try library.makeFunction(name: "AdaDeltaOptimize", constantValues: constantValues)
+			let function: MTLFunction = try library.makeFunction(name: "AdamOptimize", constantValues: constantValues)
 			let pipeline: MTLComputePipelineState = try $0.makeComputePipelineState(function: function)
 			return {
-				AdaDelta(pipeline: pipeline, count: $0)
+				Adam(pipeline: pipeline, count: $0)
 			}
 		}
 	}
 }
-extension AdaDelta: Optimizer {
+extension Adam: Optimizer {
 	public func encode(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δθ: MTLBuffer) {
 		
 		let length: Int = 16 * groups.width * MemoryLayout<Float>.size

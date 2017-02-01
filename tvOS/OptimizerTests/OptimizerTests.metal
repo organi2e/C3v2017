@@ -1,8 +1,8 @@
 //
 //  OptimizerTests.metal
-//  macOS
+//  tvOS
 //
-//  Created by Kota Nakano on 2017/01/26.
+//  Created by Kota Nakano on 2017/02/01.
 //
 //
 
@@ -13,14 +13,14 @@ kernel void dydx(device float * const dydx [[ buffer(0) ]],
 				 uint i [[ thread_position_in_grid ]],
 				 uint I [[ threads_per_grid ]]) {
 	const float w[8] = {
-		100000,
-		1000,
 		100,
+		10,
 		1,
+		10,
+		0.1,
 		1,
-		0.01,
-		0.0001,
-		0.00001
+		0.1,
+		0.01
 	};
-	dydx[i] = - w[i%8] * ( x[i] - i - 1 + 32 );
+	dydx[i] = - w[i%8] * ( x[i] - i - 1 + 64 );
 }

@@ -14,9 +14,12 @@ internal class Edge: Arcane {
 }
 extension Edge {
 	internal func collect_clear(distributor: Distributor, ignore: Set<Cell>) {
-	
+		refresh()
+		context.compute {
+			distributor.encode(commandBuffer: $0, χ: χ, μ: μ, σ: σ, count: count)
+		}
 	}
-	internal func collect(ignore: Set<Cell>) {
+	internal func collect(distributor: Distributor, ignore: Set<Cell>) {
 		
 	}
 }

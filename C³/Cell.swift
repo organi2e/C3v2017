@@ -64,11 +64,19 @@ extension Cell {
 	}
 	public func collect(ignore: Set<Cell> = Set<Cell>()) {
 		input.forEach {
-			$0.collect(ignore: ignore.union([self]))
+			$0.collect(distributor: distributor, ignore: ignore.union([self]))
 		}
 	}
 	public func correct(ignore: Set<Cell> = Set<Cell>()) {
 		
+	}
+}
+extension Cell {
+	
+}
+extension Cell {
+	var isRecurrent: Bool {
+		return feedback != nil
 	}
 }
 extension Context {

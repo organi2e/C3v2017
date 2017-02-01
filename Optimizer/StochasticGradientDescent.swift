@@ -18,25 +18,31 @@ public class StochasticGradientDescent {
 			}
 		}
 	}
-	public init(device: MTLDevice, η: Float) throws {
-		let library: MTLLibrary = try device.makeDefaultLibrary(bundle: Bundle(for: type(of: self)))
-		let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
-		constantValues.setConstantValue([η], type: .float, withName: "eta")
-		let function: MTLFunction = try library.makeFunction(name: "StochasticGradientDescentOptimize", constantValues: constantValues)
-		let pipeline: MTLComputePipelineState = try device.makeComputePipelineState(function: function)
+	private init(pipeline: MTLComputePipelineState, η: Float, count: Int) {
+		let groups: MTLSize = MTLSize(width: (count+15)/16, height: 1, depth: 1)
+		let threads: MTLSize = MTLSize(width: 1, height: 1, depth: 1)
 		optimizer = { (commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δθ: MTLBuffer) in
-			let length: Int = min(θ.length, Δθ.length) / MemoryLayout<Float>.size
+			assert(groups.width*16*MemoryLayout<Float>.size<=θ.length)
+			assert(groups.width*16*MemoryLayout<Float>.size<=Δθ.length)
+			assert(groups.width*16*MemoryLayout<Float>.size<=θ.length)
 			let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
 			encoder.setComputePipelineState(pipeline)
 			encoder.setBuffer(θ, offset: 0, at: 0)
 			encoder.setBuffer(Δθ, offset: 0, at: 1)
-			encoder.dispatchThreadgroups(MTLSize(width: (length-1)/4+1, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+			encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
 			encoder.endEncoding()
 		}
 	}
-	public static func factory(η: Float) -> (MTLDevice, Int) throws -> Optimizer {
+	public static func factory(η: Float) -> (MTLDevice) throws -> (Int) -> Optimizer {
+		let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
+		constantValues.setConstantValue([η], type: .float, withName: "eta")
 		return {
-			try StochasticGradientDescent(device: $0.0, η: η)
+			let library: MTLLibrary = try $0.makeDefaultLibrary(bundle: Bundle(for: self))
+			let function: MTLFunction = try library.makeFunction(name: "StochasticGradientDescentOptimize", constantValues: constantValues)
+			let pipeline: MTLComputePipelineState = try $0.makeComputePipelineState(function: function)
+			return {
+				StochasticGradientDescent(pipeline: pipeline, η: η, count: $0)
+			}
 		}
 	}
 }

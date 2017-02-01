@@ -14,8 +14,8 @@ kernel void exp(device float4x4 * const y [[ buffer(0) ]],
 				device float4x4 const * const x [[ buffer(1) ]],
 				constant uint const & length [[ buffer(2) ]],
 				uint const n [[ thread_position_in_grid ]]) {
-	uint4 const ofs = uint4(0, 1, 2, 3);
-	uint4 const idx = 4 * n + ofs;
+	int4 const ofs = int4(0, 1, 2, 3);
+	int4 const idx = 4 * n + ofs;
 	bool4 const can = idx < length;
 	float4x4 const a = x[idx.x];
 	float4x4 const b = x[idx.y];
