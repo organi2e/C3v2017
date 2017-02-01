@@ -1,0 +1,101 @@
+//
+//  Context.swift
+//  macOS
+//
+//  Created by Kota Nakano on 2017/01/27.
+//
+//
+
+import CoreData
+import Computer
+import Distributor
+import Optimizer
+
+public class Context: NSManagedObjectContext {
+	let computer: Computer
+	let distributor: Gauss
+	var optimizer: Optimizer
+	enum ErrorCases: Error, CustomStringConvertible {
+		case InvalidContext
+		case InvalidEntity(name: String)
+		case NoModelFound
+		case NoDeviceFound
+		var description: String {
+			switch self {
+			case let .InvalidEntity(name):
+				return "Invalid entity\(name)"
+			case .InvalidContext:
+				return "This context is invalid"
+			case .NoModelFound:
+				return "No CoreData definition was found"
+			case .NoDeviceFound:
+				return "No available Metal device found"
+			}
+		}
+	}
+	public init(storage: URL? = nil, device: MTLDevice? = nil, concurrencyType: NSManagedObjectContextConcurrencyType = .privateQueueConcurrencyType) throws {
+		guard let device: MTLDevice = device ?? MTLCreateSystemDefaultDevice() else { throw ErrorCases.NoDeviceFound }
+		computer = try Computer(device: device)
+		distributor = try Gauss(device: device)
+		optimizer = SGD(η: 0.5)
+		super.init(concurrencyType: concurrencyType)
+		guard let model: NSManagedObjectModel = NSManagedObjectModel.mergedModel(from: [Bundle(for: type(of: self))]) else { throw ErrorCases.NoModelFound }
+		let store: NSPersistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+		let type: String = storage?.pathExtension == "sqlite" ? NSSQLiteStoreType : storage != nil ? NSBinaryStoreType : NSInMemoryStoreType
+		try store.addPersistentStore(ofType: type, configurationName: nil, at: storage, options: nil)
+		persistentStoreCoordinator = store
+	}
+	public required init?(coder aDecoder: NSCoder) {
+		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { fatalError(ErrorCases.NoDeviceFound.description) }
+		computer = try!Computer(device: device)
+		distributor = try!Gauss(device: device)
+		optimizer = SGD(η: 0.5)
+		super.init(coder: aDecoder)
+	}
+	public override func encode(with aCoder: NSCoder) {
+		super.encode(with: aCoder)
+	}
+}
+extension Context {
+	var clr: ([Buffer]) -> Void {
+		return computer.zero
+	}
+	var log: (Buffer, Buffer, Int) -> Void {
+		return computer.log
+	}
+	var exp: (Buffer, Buffer, Int) -> Void {
+		return computer.exp
+	}
+	var add: (Buffer, Buffer, Buffer, Int) -> Void {
+		return computer.add
+	}
+	var mul: (Buffer, Buffer, Buffer, Int) -> Void {
+		return computer.mul
+	}
+	var compute: ((CommandBuffer) -> Void) -> Void {
+		return computer.compute
+	}
+}
+extension Context {
+	internal func make(count: Int) -> Optimizer {
+		return (try?SGD(device: computer.device, η: 1e-3)) ?? SGD(η: 1e-3)
+	}
+	internal func make(data: Data, options: ResourceOptions = []) -> Buffer {
+		return computer.make(data: data, options: options)
+	}
+	internal func make(length: Int, options: ResourceOptions = []) -> Buffer {
+		return computer.make(length: length, options: options)
+	}
+	internal func make<T: NSManagedObject>() throws -> T {
+		let name: String = String(describing: T.self)
+		guard let entity: T = NSEntityDescription.insertNewObject(forEntityName: name, into: self)as?T else { throw ErrorCases.InvalidEntity(name: name) }
+		return entity
+	}
+}
+public typealias ManagedObject = NSManagedObject
+extension ManagedObject {
+	internal var context: Context {
+		guard let context: Context = managedObjectContext as? Context else { fatalError(Context.ErrorCases.InvalidContext.description) }
+		return context
+	}
+}
