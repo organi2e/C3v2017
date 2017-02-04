@@ -6,22 +6,24 @@
 //
 //
 
+import Accelerate
 import Metal
 
 public class MomentumAdaDelta {
 	let parameters: MTLBuffer
-	let pipeline: MTLComputePipelineState
+	let optimizer: MTLComputePipelineState
 	let groups: MTLSize
 	let threads: MTLSize
-	private init(pipeline state: MTLComputePipelineState, count: Int) {
-		groups = MTLSize(width: (count+15)/16, height: 1, depth: 1)
+	private init(pipeline: MTLComputePipelineState, count: Int) {
+		groups = MTLSize(width: 1+(count-1)/16, height: 1, depth: 1)
 		threads = MTLSize(width: 1, height: 1, depth: 1)
-		pipeline = state
-		parameters = state.device.makeBuffer(length: 64*groups.width, options: .storageModePrivate)
+		optimizer = pipeline
+		parameters = pipeline.device.makeBuffer(length: 48*groups.width*MemoryLayout<Float>.size, options: .storageModePrivate)
 	}
-	public static func factory(ρ: Float = 1023/1024.0, ε: Float = 1) -> (MTLDevice) throws -> (Int) -> Optimizer {
+	public static func factory(γ: Float = 63/64.0, ρ: Float = 4095/4096.0, ε: Float = 0) -> (MTLDevice) throws -> (Int) -> Optimizer {
 		let bundle: Bundle = Bundle(for: self)
 		let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
+		constantValues.setConstantValue([γ], type: .float, withName: "gamma")
 		constantValues.setConstantValue([ρ], type: .float, withName: "rho")
 		constantValues.setConstantValue([ε], type: .float, withName: "epsilon")
 		return {
@@ -43,7 +45,7 @@ extension MomentumAdaDelta: Optimizer {
 		assert(length<=Δθ.length)
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		encoder.setComputePipelineState(pipeline)
+		encoder.setComputePipelineState(optimizer)
 		encoder.setBuffer(θ, offset: 0, at: 0)
 		encoder.setBuffer(parameters, offset: 0, at: 1)
 		encoder.setBuffer(Δθ, offset: 0, at: 2)
