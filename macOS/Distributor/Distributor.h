@@ -15,5 +15,3 @@ FOUNDATION_EXPORT double DistributorVersionNumber;
 FOUNDATION_EXPORT const unsigned char DistributorVersionString[];
 
 // In this header, you should import all the public headers of your framework using statements like #import <Distributor/PublicHeader.h>
-
-

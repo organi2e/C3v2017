@@ -20,17 +20,27 @@ inline float4x4 sq(float4x4 const x) {
 inline float4x4 sup(float4x4 w, float e) {
 	return float4x4(w[0]+e, w[1]+e, w[2]+e, w[3]+e);
 }
+inline float4x4 fabs(float4x4 const x) {
+	return float4x4(fabs(x[0]), fabs(x[1]), fabs(x[2]), fabs(x[3]));
+}
 inline float4x4 rsqrt(float4x4 const x) {
 	return float4x4(rsqrt(x[0]), rsqrt(x[1]), rsqrt(x[2]), rsqrt(x[3]));
 }
 inline float4x4 mix(float4x4 const a, float4x4 const b, float r) {
 	return float4x4(mix(a[0], b[0], r), mix(a[1], b[1], r), mix(a[2], b[2], r), mix(a[3], b[3], r));
 }
+inline float4x4 max(float4x4 const a, float4x4 const b) {
+	return float4x4(max(a[0], b[0]), max(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3]));
+}
 inline float4x4 mul(float4x4 const a, float4x4 const b) {
 	return float4x4(a[0]*b[0], a[1]*b[1], a[2]*b[2], a[3]*b[3]);
 }
+inline float4x4 div(float4x4 const a, float4x4 const b) {
+	return float4x4(a[0]/b[0], a[1]/b[1], a[2]/b[2], a[3]/b[3]);
+}
 struct parameter_t {
-	float4x4 v[2];
+	float4x4 u;
+	float4x4 v;
 };
 kernel void AdamOptimize(device float4x4 * const theta [[ buffer(0) ]],
 						 device parameter_t * const parameters [[ buffer(1) ]],
@@ -39,9 +49,13 @@ kernel void AdamOptimize(device float4x4 * const theta [[ buffer(0) ]],
 	float4x4 const g = delta[n];
 	parameter_t p = parameters[n];
 	
-	p.v[0] = mix(g, p.v[0], beta);
-	p.v[1] = mix(sq(g), p.v[1], gamma);
+	p.u = mix(g, p.u, beta);
+	//p.v = mix(fabs(g), p.v, beta);//L1
+	p.v = mix(sq(g), p.v, gamma);//L2
+	//p.v = max(fabs(g), beta*p.v);//L-Inf
 	
-	theta[n] += alpha * mul(p.v[0], rsqrt(sup(p.v[1], epsilon)));
+	//theta[n] += alpha * div(p.u, sup(p.v, epsilon));//L1orL-Inf
+	theta[n] += alpha * mul(p.u, rsqrt(sup(p.v, epsilon)));
+	
 	parameters[n] = p;
 }

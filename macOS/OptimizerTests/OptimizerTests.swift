@@ -9,8 +9,9 @@
 import Accelerate
 import Metal
 import MetalKit
+import Optimizer
+
 import XCTest
-@testable import Optimizer
 
 class OptimizerTests: XCTestCase {
 	
@@ -53,17 +54,29 @@ class OptimizerTests: XCTestCase {
 		encoder.dispatchThreadgroups(MTLSize(width: count, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
 		encoder.endEncoding()
 	}
-	func optimizerTests(device: MTLDevice, optimizer: Optimizer) {
+	func optimizerTests(factory: (MTLDevice) throws -> (Int) -> Optimizer) {
 		do {
-			let gradient: MTLComputePipelineState = try prepare(device: device, name: "dydx")
+			guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
+			let optimizer: Optimizer = try factory(device)(count)
+			
+			let gradientS: MTLComputePipelineState = try prepare(device: device, name: "dydx")
+			let gradientN: MTLComputePipelineState = try prepare(device: device, name: "dydx2")
 			let θ: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
 			let Δθ: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
 			let queue: MTLCommandQueue = device.makeCommandQueue()
 			//uniform(x: θ)
-			(0..<16384).forEach { (_) in
+			let reset: MTLCommandBuffer = queue.makeCommandBuffer()
+			optimizer.reset(commandBuffer: reset)
+			reset.commit()
+			
+			(0..<1024*4).forEach { (_) in
 				do {
 					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-					apply(commandBuffer: commandBuffer, pipeline: gradient, dydx: Δθ, x: θ)
+					if drand48() < 1.0 {
+						apply(commandBuffer: commandBuffer, pipeline: gradientN, dydx: Δθ, x: θ)
+					} else {
+						apply(commandBuffer: commandBuffer, pipeline: gradientS, dydx: Δθ, x: θ)
+					}
 					commandBuffer.commit()
 				}
 				do {
@@ -82,40 +95,19 @@ class OptimizerTests: XCTestCase {
 		}
 	}
 	func testMomentumAdaDelta() {
-		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
-		do {
-			let optimizer: Optimizer = try MomentumAdaDelta(device: device, count: count)
-			optimizerTests(device: device, optimizer: optimizer)
-		} catch {
-			XCTFail(String(describing: error))
-		}
+		optimizerTests(factory: MomentumAdaDelta.factory())
 	}
 	func testAdaDelta() {
-		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
-		do {
-			let optimizer: Optimizer = try AdaDelta(device: device, count: count)
-			optimizerTests(device: device, optimizer: optimizer)
-		} catch {
-			XCTFail(String(describing: error))
-		}
+		optimizerTests(factory: AdaDelta.factory())
+	}
+	func testAdam() {
+		optimizerTests(factory: Adam.factory(α: 1))
 	}
 	func testMomentum() {
-		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
-		do {
-			let optimizer: Optimizer = try Momentum(device: device, count: count)
-			optimizerTests(device: device, optimizer: optimizer)
-		} catch {
-			XCTFail(String(describing: error))
-		}
+		optimizerTests(factory: Momentum.factory(η: 1e-3, γ: 0.9))
 	}
 	func testStochasticGradientDescent() {
-		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
-		do {
-			let optimizer: Optimizer = try StochasticGradientDescent(device: device, η: 1e-4)
-			optimizerTests(device: device, optimizer: optimizer)
-		} catch {
-			XCTFail(String(describing: error))
-		}
+		optimizerTests(factory: StochasticGradientDescent.factory(η: 1e-3))
 	}
 }
 extension MTLBuffer {

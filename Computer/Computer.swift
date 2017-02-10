@@ -8,8 +8,9 @@
 
 import Metal
 
-public class Computer {
-	let queue: MTLCommandQueue
+final public class Computer {
+	
+	let queue: CommandQueue
 	
 	let add: ComputePipelineState
 	let sub: ComputePipelineState
@@ -22,10 +23,11 @@ public class Computer {
 	let sign: ComputePipelineState
 	let sigm: ComputePipelineState
 	
-	let gemv: ComputePipelineState
+	let gemv16: ComputePipelineState
+	let gemm16: ComputePipelineState
 	
-	let threads: Int
-	public init(device: MTLDevice) throws {
+	let threads: MTLSize
+	public init(device: Device) throws {
 		
 		let library: Library = try device.makeDefaultLibrary(bundle: Bundle(for: type(of: self)))
 		
@@ -40,11 +42,12 @@ public class Computer {
 		sign = try library.make(name: "sign")
 		sigm = try library.make(name: "sigm")
 		
-		gemv = try library.make(name: "gemv")
+		gemv16 = try library.make(name: "gemv16")
+		gemm16 = try library.make(name: "gemv16")
 		
 		queue = device.makeCommandQueue()
 		
-		threads = 64
+		threads = MTLSize(width: 64, height: 1, depth: 1)
 	}
 	public func wait() {
 		let commandBuffer: CommandBuffer = queue.makeCommandBuffer()
@@ -84,6 +87,9 @@ extension Computer {
 		block(commandBuffer)
 		commandBuffer.commit()
 	}
+	public func make() -> CommandBuffer {
+		return queue.makeCommandBuffer()
+	}
 	public func make(length: Int, options: ResourceOptions) -> Buffer {
 		return queue.device.makeBuffer(length: length, options: options)
 	}
@@ -94,8 +100,12 @@ extension Computer {
 	}
 }
 extension Buffer {
-	internal var pointer: UnsafeMutablePointer<Float> {
-		return UnsafeMutablePointer<Float>(OpaquePointer(contents()))
+	public func reference<T>() -> UnsafeMutablePointer<T> {
+		return UnsafeMutablePointer<T>(OpaquePointer(contents()))
+	}
+	public func feed<T>(buffer: [T]) {
+		Data(bytes: buffer, count: buffer.count*MemoryLayout<T>.size).copyBytes(to: UnsafeMutablePointer<UInt8>(OpaquePointer(contents())), count: length)
+		//didModifyRange(NSRange(location: 0, length: length))
 	}
 }
 extension Library {
@@ -104,14 +114,19 @@ extension Library {
 	}
 }
 
-typealias ComputePipelineState = MTLComputePipelineState
-typealias ComputeCommandEncoder = MTLComputeCommandEncoder
-typealias BlitCommandEncoder = MTLBlitCommandEncoder
-typealias Library = MTLLibrary
-typealias Function = MTLFunction
-typealias FunctionConstantValues = MTLFunctionConstantValues
+public protocol Compute {
+	func compute(block: ((CommandBuffer)->Void)?) -> CommandBuffer
+}
+
+public typealias ComputePipelineState = MTLComputePipelineState
+public typealias ComputeCommandEncoder = MTLComputeCommandEncoder
+public typealias BlitCommandEncoder = MTLBlitCommandEncoder
+public typealias Library = MTLLibrary
+public typealias Function = MTLFunction
+public typealias FunctionConstantValues = MTLFunctionConstantValues
 
 public typealias Device = MTLDevice
 public typealias Buffer = MTLBuffer
+public typealias CommandQueue = MTLCommandQueue
 public typealias CommandBuffer = MTLCommandBuffer
 public typealias ResourceOptions = MTLResourceOptions

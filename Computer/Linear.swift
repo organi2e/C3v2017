@@ -21,7 +21,7 @@ extension Computer {
 			encoder.setBuffer(y, offset: 0, at: 1)
 			encoder.setBuffer(x, offset: 0, at: 2)
 			encoder.setBytes([uint(count-1)/16+1], length: MemoryLayout<uint>.size, at: 3)
-			encoder.dispatchThreadgroups(MTLSize(width: (count-1)/(threads*64)+1, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: threads, height: 1, depth: 1))
+			encoder.dispatchThreadgroups(MTLSize(width: (count-1)/(threads.width*64)+1, height: 1, depth: 1), threadsPerThreadgroup: threads)
 			encoder.endEncoding()
 		}
 		commandBuffer.commit()
@@ -45,7 +45,7 @@ extension Computer {
 		
 		let commandBuffer: CommandBuffer = queue.makeCommandBuffer()
 		let encoder: ComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		encoder.setComputePipelineState(gemv)
+		encoder.setComputePipelineState(gemv16)
 		encoder.setBuffer(y, offset: 0, at: 0)
 		encoder.setBuffer(w, offset: 0, at: 1)
 		encoder.setBuffer(x, offset: 0, at: 2)
@@ -56,4 +56,5 @@ extension Computer {
 		commandBuffer.commit()
 		
 	}
+	
 }

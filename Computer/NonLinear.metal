@@ -12,19 +12,13 @@ inline float4 sigm(float4);
 //Compute nonlinear math functions of 16-packed single precision floatings numbers, 4 times
 kernel void exp(device float4x4 * const y [[ buffer(0) ]],
 				device float4x4 const * const x [[ buffer(1) ]],
-				constant uint const & length [[ buffer(2) ]],
 				uint const n [[ thread_position_in_grid ]]) {
-	int4 const ofs = int4(0, 1, 2, 3);
-	int4 const idx = 4 * n + ofs;
-	bool4 const can = idx < length;
-	float4x4 const a = x[idx.x];
-	float4x4 const b = x[idx.y];
-	float4x4 const c = x[idx.z];
-	float4x4 const d = x[idx.w];
-	if ( can.x ) y[idx.x] = float4x4(exp(a[ofs.x]), exp(a[ofs.y]), exp(a[ofs.z]), exp(a[ofs.w]));
-	if ( can.y ) y[idx.y] = float4x4(exp(b[ofs.x]), exp(b[ofs.y]), exp(b[ofs.z]), exp(b[ofs.w]));
-	if ( can.z ) y[idx.z] = float4x4(exp(c[ofs.x]), exp(c[ofs.y]), exp(c[ofs.z]), exp(c[ofs.w]));
-	if ( can.w ) y[idx.w] = float4x4(exp(d[ofs.x]), exp(d[ofs.y]), exp(d[ofs.z]), exp(d[ofs.w]));
+	int const idx = n;
+	float4x4 const v = x[idx];
+	y[idx] = float4x4(exp(v[0]),
+					  exp(v[1]),
+					  exp(v[2]),
+					  exp(v[3]));
 }
 kernel void log(device float4x4 * const y [[ buffer(0) ]],
 				device float4x4 const * const x [[ buffer(1) ]],
@@ -33,14 +27,10 @@ kernel void log(device float4x4 * const y [[ buffer(0) ]],
 	uint4 const ofs = uint4(0, 1, 2, 3);
 	uint4 const idx = 4 * n + ofs;
 	bool4 const can = idx < length;
-	float4x4 const a = x[idx.x];
-	float4x4 const b = x[idx.y];
-	float4x4 const c = x[idx.z];
-	float4x4 const d = x[idx.w];
-	if ( can.x ) y[idx.x] = float4x4(log(a[ofs.x]), log(a[ofs.y]), log(a[ofs.z]), log(a[ofs.w]));
-	if ( can.y ) y[idx.y] = float4x4(log(b[ofs.x]), log(b[ofs.y]), log(b[ofs.z]), log(b[ofs.w]));
-	if ( can.z ) y[idx.z] = float4x4(log(c[ofs.x]), log(c[ofs.y]), log(c[ofs.z]), log(c[ofs.w]));
-	if ( can.w ) y[idx.w] = float4x4(log(d[ofs.x]), log(d[ofs.y]), log(d[ofs.z]), log(d[ofs.w]));
+	if ( can.x ) { float4x4 const v = x[idx.x]; y[idx.x] = float4x4(log(v[0]), log(v[1]), log(v[2]), log(v[3]));}
+	if ( can.y ) { float4x4 const v = x[idx.y]; y[idx.y] = float4x4(log(v[0]), log(v[1]), log(v[2]), log(v[3]));}
+	if ( can.z ) { float4x4 const v = x[idx.w]; y[idx.z] = float4x4(log(v[0]), log(v[1]), log(v[2]), log(v[3]));}
+	if ( can.w ) { float4x4 const v = x[idx.z]; y[idx.w] = float4x4(log(v[0]), log(v[1]), log(v[2]), log(v[3]));}
 }
 kernel void sign(device float4x4 * const y [[ buffer(0) ]],
 				 device float4x4 const * const x [[ buffer(1) ]],
@@ -58,22 +48,35 @@ kernel void sign(device float4x4 * const y [[ buffer(0) ]],
 	if ( can.z ) y[idx.z] = float4x4(sign(c[ofs.x]), sign(c[ofs.y]), sign(c[ofs.z]), sign(c[ofs.w]));
 	if ( can.w ) y[idx.w] = float4x4(sign(d[ofs.x]), sign(d[ofs.y]), sign(d[ofs.z]), sign(d[ofs.w]));
 }
-kernel void sigm(device float4x4 * const y [[ buffer(0) ]],
+/*
+ Compute sigmoid function, by tvOS sec for 1024 * 1024 * 1024 = 5.2(CPU) vs 1.4(GPU)
+ */
+kernel void sigm2(device float4x4 * const y [[ buffer(0) ]],
 				 device float4x4 const * const x [[ buffer(1) ]],
 				 constant uint const & length [[ buffer(2) ]],
 				 uint const n [[ thread_position_in_grid ]]) {
-	uint4 const ofs = uint4(0, 1, 2, 3);
-	uint4 const idx = 4 * n + ofs;
+	int4 const ofs = int4(0, 1, 2, 3);
+	int4 const idx = 4 * n + ofs;
 	bool4 const can = idx < length;
-	float4x4 const a = x[idx.x];
-	float4x4 const b = x[idx.y];
-	float4x4 const c = x[idx.z];
-	float4x4 const d = x[idx.w];
-	if ( can.x ) y[idx.x] = float4x4(sigm(a[ofs.x]), sigm(a[ofs.y]), sigm(a[ofs.z]), sigm(a[ofs.w]));
-	if ( can.y ) y[idx.y] = float4x4(sigm(b[ofs.x]), sigm(b[ofs.y]), sigm(b[ofs.z]), sigm(b[ofs.w]));
-	if ( can.z ) y[idx.z] = float4x4(sigm(c[ofs.x]), sigm(c[ofs.y]), sigm(c[ofs.z]), sigm(c[ofs.w]));
-	if ( can.w ) y[idx.w] = float4x4(sigm(d[ofs.x]), sigm(d[ofs.y]), sigm(d[ofs.z]), sigm(d[ofs.w]));
+	if ( can.x )
+	{ float4x4 const v = x[idx.x]; y[idx.x] = float4x4(sigm(v[0]), sigm(v[1]), sigm(v[2]), sigm(v[3])); }
+	if ( can.y )
+	{ float4x4 const v = x[idx.y]; y[idx.y] = float4x4(sigm(v[0]), sigm(v[1]), sigm(v[2]), sigm(v[3])); }
+	if ( can.z )
+	{ float4x4 const v = x[idx.z]; y[idx.z] = float4x4(sigm(v[0]), sigm(v[1]), sigm(v[2]), sigm(v[3])); }
+	if ( can.w )
+	{ float4x4 const v = x[idx.w]; y[idx.w] = float4x4(sigm(v[0]), sigm(v[1]), sigm(v[2]), sigm(v[3])); }
 }
+/*
+ Compute sigmoid function, by tvOS sec for 1024 * 1024 * 1024 = 5.2(CPU) vs 1.4(GPU)
+ */
+kernel void sigm(device float4x4 * const y [[ buffer(0) ]],
+				 device float4x4 const * const x [[ buffer(1) ]],
+				 uint const n [[ thread_position_in_grid ]]) {
+	float4x4 const v = x[n];
+	y[n] = float4x4(sigm(v[0]), sigm(v[1]), sigm(v[2]), sigm(v[3]));
+}
+
 kernel void tanh(device float4x4 * const y [[ buffer(0) ]],
 				 device float4x4 const * const x [[ buffer(1) ]],
 				 constant uint const & length [[ buffer(2) ]],

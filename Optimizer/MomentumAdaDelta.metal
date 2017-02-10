@@ -29,10 +29,10 @@ kernel void MomentumAdaDeltaOptimize(device float4x4 * const theta [[ buffer(0) 
 								fabs(g[2]),
 								fabs(g[3]));
 	
-	p.gv[0] = max(m[0], p.gv[0] * rho);
-	p.gv[1] = max(m[1], p.gv[1] * rho);
-	p.gv[2] = max(m[2], p.gv[2] * rho);
-	p.gv[3] = max(m[3], p.gv[3] * rho);
+	p.gv[0] = max(m[0], p.gv[0]) * rho;
+	p.gv[1] = max(m[1], p.gv[1]) * rho;
+	p.gv[2] = max(m[2], p.gv[2]) * rho;
+	p.gv[3] = max(m[3], p.gv[3]) * rho;
 	
 	float4x4 const s = float4x4(p.vv[0] / p.gv[0],
 								p.vv[1] / p.gv[1],
@@ -60,11 +60,10 @@ kernel void MomentumAdaDeltaOptimize(device float4x4 * const theta [[ buffer(0) 
 						 t[2] * (p.uu[2] = mix(g[2], p.uu[2], gamma)),
 						 t[3] * (p.uu[3] = mix(g[3], p.uu[3], gamma)));
 	
-	
-	p.vv[0] = max(v[0], p.vv[0] * rho);
-	p.vv[1] = max(v[1], p.vv[1] * rho);
-	p.vv[2] = max(v[2], p.vv[2] * rho);
-	p.vv[3] = max(v[3], p.vv[3] * rho);
+	p.vv[0] = max(v[0], p.vv[0]) * rho;
+	p.vv[1] = max(v[1], p.vv[1]) * rho;
+	p.vv[2] = max(v[2], p.vv[2]) * rho;
+	p.vv[3] = max(v[3], p.vv[3]) * rho;
 	
 	parameters[n] = p;
 }

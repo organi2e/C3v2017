@@ -9,15 +9,15 @@
 import Metal
 
 public class Adam {
-	let pipeline: MTLComputePipelineState
+	let optimizer: MTLComputePipelineState
 	let parameters: MTLBuffer
 	let groups: MTLSize
 	let threads: MTLSize
-	private init(pipeline state: MTLComputePipelineState, count: Int) {
+	private init(pipeline: MTLComputePipelineState, count: Int) {
 		groups = MTLSize(width: (count+15)/16, height: 1, depth: 1)
 		threads = MTLSize(width: 1, height: 1, depth: 1)
-		pipeline = state
-		parameters = state.device.makeBuffer(length: 32*groups.width, options: .storageModePrivate)
+		optimizer = pipeline
+		parameters = pipeline.device.makeBuffer(length: 2*16*groups.width*MemoryLayout<Float>.size, options: .storageModePrivate)
 	}
 	public static func factory(α: Float = 1e-3, β: Float = 0.9, γ: Float = 0.999, ε: Float = 1e-8) -> (MTLDevice) throws -> (Int) -> Optimizer {
 		let bundle: Bundle = Bundle(for: self)
@@ -37,18 +37,16 @@ public class Adam {
 	}
 }
 extension Adam: Optimizer {
-	public func encode(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δθ: MTLBuffer) {
+	public func optimize(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δ: MTLBuffer) {
 		
-		let length: Int = 16 * groups.width * MemoryLayout<Float>.size
-		
-		assert(length<=θ.length)
-		assert(length<=Δθ.length)
+		assert(16 * groups.width * MemoryLayout<Float>.size<=θ.length)
+		assert(16 * groups.width * MemoryLayout<Float>.size<=Δ.length)
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		encoder.setComputePipelineState(pipeline)
+		encoder.setComputePipelineState(optimizer)
 		encoder.setBuffer(θ, offset: 0, at: 0)
 		encoder.setBuffer(parameters, offset: 0, at: 1)
-		encoder.setBuffer(Δθ, offset: 0, at: 2)
+		encoder.setBuffer(Δ, offset: 0, at: 2)
 		encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
 		encoder.endEncoding()
 		

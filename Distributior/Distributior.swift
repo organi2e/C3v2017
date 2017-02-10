@@ -7,44 +7,28 @@
 //
 
 import Metal
+import LaObjet
 
 public protocol Stochastic {
-	func encode(commandBuffer: MTLCommandBuffer, CDF: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int)
-	func encode(commandBuffer: MTLCommandBuffer, PDF: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int)
-	func encode(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int)
+	func shuffle(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, from: (μ: MTLBuffer, σ: MTLBuffer), count: Int)
 }
 public protocol Synthesis {
-	//Probably
-	//Fire exp
-	func collect(commandBuffer: MTLCommandBuffer,
-	             Σ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer),
-	             w: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer),
-	             x: MTLBuffer,
-	             count: (rows: Int, cols: Int)
-	)
-	func collect(commendBuffer: MTLCommandBuffer,
-	             Σ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer),
-	             w: MTLBuffer,
-	             x: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer),
-	             count: (rows: Int, cols: Int)
-	)
-	func collect(commandBuffer: MTLCommandBuffer,
-	             Σ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer),
-	             w: MTLBuffer,
-	             x: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer),
-	             count: Int
-	)
-	func collect(commandBuffer: MTLCommandBuffer,
-	             Σ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer),
-	             b: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer),
-	             count: Int
-	)
+	func μ(_: LaObjet) -> LaObjet
+	func σ(_: LaObjet) -> LaObjet
+	func synthesize(commandBuffer: MTLCommandBuffer, ϝ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer), Σ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer), count: Int)
+	/*
+	func collect(r: MTLBuffer, x: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer))
+	func collect(w: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer), x: MTLBuffer)
+	func collect(x: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer))
+	func clear()
+	*/
 }
 public protocol Distributor: Stochastic, Synthesis {
-
+	
 }
 extension MTLLibrary {
 	internal func make(name: String, constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()) throws -> MTLComputePipelineState {
 		return try device.makeComputePipelineState(function: try makeFunction(name: name, constantValues: constantValues))
 	}
 }
+

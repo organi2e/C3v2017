@@ -12,29 +12,136 @@ using namespace metal;
 inline float4 erf(float4);
 
 inline float4x4 BoxMuller(float4x4,float4x4,float4x4);
+inline float4x4 BoxMuller(float,float,float);
 inline float4x4 exp(float4x4);
 inline float4x4 step(float, float4x4);
 inline float4x4 sqrt(float4x4);
 inline float4x4 sq(float4x4 const);
 inline float4x4 mul(float4x4, float4x4);
 inline float4x4 div(float4x4, float4x4);
+inline float4x4 rsqrt(float4x4);
 
 constant uint3 const xorshift [[ function_constant(0) ]];
-constant float const scale = 1.0 / 4294967296.0;
-constant float const standardization = 0.5 * M_2_SQRTPI_F * M_SQRT1_2_F;
 
-kernel void GaussRNG(device float4x4 * const value [[ buffer(0) ]],
-					 device const float4x4 * const mu [[ buffer(1) ]],
-					 device const float4x4 * const sigma [[ buffer(2) ]],
-					 constant const uint4 * const seeds [[ buffer(3) ]],
-					 constant const uint & length [[ buffer(4) ]],
-					 uint const n [[ thread_position_in_grid ]],
-					 uint const N [[ threads_per_grid ]]) {
+kernel void GaussSynthesize16(device float4x4 * const state [[ buffer(0) ]],
+							  device float4x4 * const mu [[ buffer(1) ]],
+							  device float4x4 * const sigma [[ buffer(2) ]],
+							  device float4x4 const * const sum_value [[ buffer(3) ]],
+							  device float4x4 const * const sum_mu [[ buffer(4) ]],
+							  device float4x4 const * const sum_sigma [[ buffer(5) ]],
+							  uint const n [[ thread_position_in_grid ]]) {
+	int const k = n;
 	
+	float4x4 const v = sum_value[k];
+	float4x4 const m = sum_mu[k];
+	float4x4 const s = sum_sigma[k];
+
+	state[k] = float4x4(step(0.0,v[0]),
+						step(0.0,v[1]),
+						step(0.0,v[2]),
+						step(0.0,v[3]));
+	mu[k] = m;
+	sigma[k] = float4x4(sqrt(s[0]),
+						sqrt(s[1]),
+						sqrt(s[2]),
+						sqrt(s[3]));
+	
+	
+	/*
+	float4x4 const mu = accum_mu[n];
+	float4x4 const sigma = accum_sigma[n];
+	float4x4 const lambda = float4x4(rsqrt(sigma[0]), rsqrt(sigma[1]), rsqrt(sigma[2]), rsqrt(sigma[3]));
+	float4x4 const level = float4x4(mu[0]*lambda[0], mu[1]*lambda[1], mu[2]*lambda[2], mu[3]*lambda[3]);
+	float4x4 const grads = standardization * float4x4(exp(-0.5*level[0]*level[0]),
+													  exp(-0.5*level[1]*level[1]),
+													  exp(-0.5*level[2]*level[2]),
+													  exp(-0.5*level[3]*level[3]));
+	
+	float4x4 const gu = float4x4(grads[0]*lambda[0],
+								 grads[1]*lambda[1],
+								 grads[2]*lambda[2],
+								 grads[3]*lambda[3]);
+	float4x4 const gs = float4x4(0);
+	state[n] = step(0.0, value[n]);
+	grads_mu[n] = gu;
+	grads_sigma[n] = gs;
+	 */
+}
+kernel void GaussSynthesize(device float * const state [[ buffer(0) ]],
+							device float * const mu [[ buffer(1) ]],
+							device float * const sigma [[ buffer(2) ]],
+							device float const * const sum_value [[ buffer(3) ]],
+							device float const * const sum_mu [[ buffer(4) ]],
+							device float const * const sum_sigma [[ buffer(5) ]],
+							uint const n [[ thread_position_in_grid ]]) {
+	int const k = n;
+	state[k] = step(0, sum_value[k]);
+	mu[k] = sum_mu[k];
+	sigma[k] = sqrt(sum_sigma[k]);
+}
+kernel void GaussGradient(device float4x4 * const mu [[ buffer(0) ]],
+						  device float4x4 * const sigma [[ buffer(1) ]],
+						  device float4x4 const * const sum_mu [[ buffer(2) ]],
+						  device float4x4 const * const sum_sigma [[ buffer(3) ]],
+						  uint const n [[ thread_position_in_grid ]],
+						  uint const N [[ threads_per_grid ]]) {
+	
+	float const scale = 0.5 * M_2_SQRTPI_F * M_SQRT1_2_F;
+	
+	int const k = n;
+	
+	float4x4 const u = mu[k];
+	float4x4 const s = sum_sigma[n];
+	
+	float4x4 const l = float4x4(rsqrt(s[0]),
+								rsqrt(s[1]),
+								rsqrt(s[2]),
+								rsqrt(s[3]));
+	
+	float4x4 const x = float4x4(l[0]*u[0],
+								l[1]*u[1],
+								l[2]*u[2],
+								l[3]*u[3]);
+	
+	float4x4 const g = scale * float4x4(exp(-0.5*x[0]*x[0])*l[0],
+										exp(-0.5*x[1]*x[1])*l[1],
+										exp(-0.5*x[2]*x[2])*l[2],
+										exp(-0.5*x[3]*x[3])*l[3]);
+	
+	mu[k] = float4x4(g[0],
+					 g[1],
+					 g[2],
+					 g[3]);
+	
+	sigma[k] = float4x4(-g[0]*x[0],
+						-g[1]*x[1],
+						-g[2]*x[2],
+						-g[3]*x[3]);
+	
+}
+
+kernel void GaussRNG2(device float2 * const value [[ buffer(0) ]],
+					  device const float2 * const mu [[ buffer(1) ]],
+					  device const float2 * const sigma [[ buffer(2) ]],
+					  constant const uint2 * const seeds [[ buffer(3) ]],
+					  uint const n [[ thread_position_in_grid ]],
+					  uint const N [[ threads_per_grid ]]) {
+	float2 const u = (float2(seeds[n]) + 0.5)/ 4294967296.0;
+	value[n] = sqrt(-2.0*log(u.y)) * float2(cospi(2.0*u.x), sinpi(2.0*u.x));
+}
+
+kernel void GaussRNG16(device float4x4 * const value [[ buffer(0) ]],
+					   device const float4x4 * const mu [[ buffer(1) ]],
+					   device const float4x4 * const sigma [[ buffer(2) ]],
+					   constant const uint4 * const seeds [[ buffer(3) ]],
+					   constant const uint & length [[ buffer(4) ]],
+					   uint const n [[ thread_position_in_grid ]],
+					   uint const N [[ threads_per_grid ]]) {
+	float const s = 1 / 4294967296.0;
 	uint4 seq = seeds[n];
 	seq = select ( seq, ~0, seq == 0 );
 	
-	for ( uint k = n ; k < length ; k += N ) {
+	for ( int k = n, K = length ; k < K ; k += N ) {
 		
 		float4x4 u;
 		
@@ -43,10 +150,11 @@ kernel void GaussRNG(device float4x4 * const value [[ buffer(0) ]],
 		seq ^= seq << xorshift.x, seq ^= seq >> xorshift.y, seq ^= seq << xorshift.z; u[2] = float4(seq) - 0.5;
 		seq ^= seq << xorshift.x, seq ^= seq >> xorshift.y, seq ^= seq << xorshift.z; u[3] = float4(seq) - 0.5;
 		
-		value[k] = BoxMuller(mu[k], sigma[k], scale*u);
+		value[k] = BoxMuller(mu[k], sigma[k], s*u);
 		
 	}
 }
+/*
 kernel void GaussCDF(device float4x4 * const f [[ buffer(0) ]],
 					 device const float4x4 * const mu [[ buffer(1) ]],
 					 device const float4x4 * const sigma [[ buffer(2) ]],
@@ -105,114 +213,85 @@ kernel void GaussPDF(device float4x4 * const p [[ buffer(0) ]],
 		p[idx.w] = standardization * div(exp(-0.5*sq(div(mu[k], s))), s);
 	}
 }
-kernel void GaussSynth(device float4x4 * const fire [[ buffer(0) ]],
-					   device float4x4 * const mu [[ buffer(1) ]],
-					   device float4x4 * const sigma [[ buffer(2) ]],
-					   device float4x4 const * const value [[ buffer(3) ]],
-					   constant uint const & length [[ buffer(4) ]],
-					   uint const n [[ thread_position_in_grid ]],
-					   uint const N [[ threads_per_grid]]) {
-	int4 const ofs = int4(0, 1, 2, 3);
-	int4 const idx = 4 * n + ofs;
-	bool4 const can = idx < length;
-	if ( can.x ) {
-		int const k = idx.x;
-		fire[k] = step(0, value[k]);
-		sigma[k] = sqrt(sigma[k]);
-	}
-	if ( can.y ) {
-		int const k = idx.y;
-		fire[k] = step(0, value[k]);
-		sigma[k] = sqrt(sigma[k]);
-	}
-	if ( can.z ) {
-		int const k = idx.z;
-		fire[k] = step(0, value[k]);
-		sigma[k] = sqrt(sigma[k]);
-	}
-	if ( can.w ) {
-		int const k = idx.w;
-		fire[k] = step(0, value[k]);
-		sigma[k] = sqrt(sigma[k]);
-	}
+*/
+inline float4 shuffle(float4x4 const w[4], float4x4 const x) {
+	return	x[0]*float4x4(w[0][0], w[1][0], w[2][0], w[3][0])+
+			x[1]*float4x4(w[0][1], w[1][1], w[2][1], w[3][1])+
+			x[2]*float4x4(w[0][2], w[1][2], w[2][2], w[3][2])+
+			x[3]*float4x4(w[0][3], w[1][3], w[2][3], w[3][3]);
 }
-float4 shuffle(float4x4 const w[4], float4x4 const x);
-float4 shuffle(float4x4 const w[4], float4x4 const x) {
-	return float4(x[0]*float4x4(w[0][0], w[1][0], w[2][0], w[3][0]) +
-				  x[1]*float4x4(w[0][1], w[1][1], w[2][1], w[3][1]) +
-				  x[2]*float4x4(w[0][2], w[1][2], w[2][2], w[3][2]) +
-				  x[3]*float4x4(w[0][3], w[1][3], w[2][3], w[3][3]));
-}
-kernel void GaussCollectChain(device float4x4 * const y_value [[ buffer(0) ]],
-							  device float4x4 * const y_mu [[ buffer(1) ]],
-							  device float4x4 * const y_sigma [[ buffer(2) ]],
-							  device float4x4 const * const w_value [[ buffer(3) ]],
-							  device float4x4 const * const w_mu [[ buffer(4) ]],
-							  device float4x4 const * const w_sigma [[ buffer(5) ]],
-							  device float4x4 const * const x [[ buffer(6) ]],
-							  constant uint const & length [[ buffer(7) ]],
-							  threadgroup float4x4 * accumulator_value [[ threadgroup(0) ]],
-							  threadgroup float4x4 * accumulator_mu [[ threadgroup(1) ]],
-							  threadgroup float4x4 * accumulator_sigma [[ threadgroup(2) ]],
-							  uint const t [[ thread_position_in_threadgroup ]],
-							  uint const T [[ threads_per_threadgroup ]],
-							  uint const m [[ threadgroup_position_in_grid ]]) {
+kernel void GaussCollectA(device float4x4 * const y_value [[ buffer(0) ]],
+						  device float4x4 * const y_mu [[ buffer(1) ]],
+						  device float4x4 * const y_sigma [[ buffer(2) ]],
+						  device float4x4 const * const w_value [[ buffer(3) ]],
+						  device float4x4 const * const w_mu [[ buffer(4) ]],
+						  device float4x4 const * const w_sigma [[ buffer(5) ]],
+						  device float4x4 const * const x [[ buffer(6) ]],
+						  constant uint const & length [[ buffer(7) ]],
+						  threadgroup float4x4 * accumulator_value [[ threadgroup(0) ]],
+						  threadgroup float4x4 * accumulator_mu [[ threadgroup(1) ]],
+						  threadgroup float4x4 * accumulator_sigma [[ threadgroup(2) ]],
+						  uint const t [[ thread_position_in_threadgroup ]],
+						  uint const T [[ threads_per_threadgroup ]],
+						  uint const m [[ threadgroup_position_in_grid ]]) {
+	
 	int4 const ref[4] = {
-		(16 * m + int4(0x0, 0x1, 0x2, 0x3))*length,
-		(16 * m + int4(0x4, 0x5, 0x6, 0x7))*length,
-		(16 * m + int4(0x8, 0x9, 0xa, 0xb))*length,
-		(16 * m + int4(0xc, 0xd, 0xe, 0xf))*length
+		( 16 * m + 0x0 + int4(0, 1, 2, 3)) * length,
+		( 16 * m + 0x4 + int4(0, 1, 2, 3)) * length,
+		( 16 * m + 0x8 + int4(0, 1, 2, 3)) * length,
+		( 16 * m + 0xc + int4(0, 1, 2, 3)) * length
 	};
 	
 	float4x4 value = float4x4(0);
 	float4x4 mu = float4x4(0);
 	float4x4 sigma = float4x4(0);
 	
-	//split each element because several gpu architecture has few register memory
+	//split each element because several gpu architecture has few register
 	for ( int k = t, K = length ; k < K ; k += T ) {
 		float4x4 const f = x[k];
 		{
 			int4 const idx = k + ref[0];
-			float4x4 const weight_value[4] = {w_value[idx.x], w_value[idx.y], w_value[idx.z], w_value[idx.w]};
-			value[0] += shuffle(weight_value, f);
+			{
+				float4x4 const weight_value[4] = {w_value[idx.x], w_value[idx.y], w_value[idx.z], w_value[idx.w]};
+				value[0] += shuffle(weight_value, f);
+			}
+			{
+				float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
+				mu[0] += shuffle(weight_mu, f);
+			}
 		}
 		{
 			int4 const idx = k + ref[1];
-			float4x4 const weight_value[4] = {w_value[idx.x], w_value[idx.y], w_value[idx.z], w_value[idx.w]};
-			value[1] += shuffle(weight_value, f);
+			{
+				float4x4 const weight_value[4] = {w_value[idx.x], w_value[idx.y], w_value[idx.z], w_value[idx.w]};
+				value[1] += shuffle(weight_value, f);
+			}
+			{
+				float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
+				mu[1] += shuffle(weight_mu, f);
+			}
 		}
 		{
 			int4 const idx = k + ref[2];
-			float4x4 const weight_value[4] = {w_value[idx.x], w_value[idx.y], w_value[idx.z], w_value[idx.w]};
-			value[2] += shuffle(weight_value, f);
+			{
+				float4x4 const weight_value[4] = {w_value[idx.x], w_value[idx.y], w_value[idx.z], w_value[idx.w]};
+				value[2] += shuffle(weight_value, f);
+			}
+			{
+				float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
+				mu[2] += shuffle(weight_mu, f);
+			}
 		}
 		{
 			int4 const idx = k + ref[3];
-			float4x4 const weight_value[4] = {w_value[idx.x], w_value[idx.y], w_value[idx.z], w_value[idx.w]};
-			value[3] += shuffle(weight_value, f);
-		}
-	}
-	for ( int k = t, K = length ; k < K ; k += T ) {
-		float4x4 const f = x[k];
-		{
-			int4 const idx = k + ref[0];
-			float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
-			mu[0] += shuffle(weight_mu, f);
-		}
-		{
-			int4 const idx = k + ref[1];
-			float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
-			mu[1] += shuffle(weight_mu, f);
-		}
-		{
-			int4 const idx = k + ref[2];
-			float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
-			mu[2] += shuffle(weight_mu, f);
-		}
-		{
-			int4 const idx = k + ref[3];
-			float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
-			mu[3] += shuffle(weight_mu, f);
+			{
+				float4x4 const weight_value[4] = {w_value[idx.x], w_value[idx.y], w_value[idx.z], w_value[idx.w]};
+				value[3] += shuffle(weight_value, f);
+			}
+			{
+				float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
+				mu[3] += shuffle(weight_mu, f);
+			}
 		}
 	}
 	for ( int k = t, K = length ; k < K ; k += T ) {
@@ -260,84 +339,50 @@ kernel void GaussCollectChain(device float4x4 * const y_value [[ buffer(0) ]],
 		y_mu[idx] += accumulator_mu[a];
 		y_sigma[idx] += accumulator_sigma[a];
 	}
+	
 }
-kernel void GaussCollectGain(device float4x4 * const y_value [[ buffer(0) ]],
-							 device float4x4 * const y_mu [[ buffer(1) ]],
-							 device float4x4 * const y_sigma [[ buffer(2) ]],
-							 device float4x4 const * const weight [[ buffer(3) ]],
-							 device float4x4 const * const x_value [[ buffer(4) ]],
-							 device float4x4 const * const x_mu [[ buffer(5) ]],
-							 device float4x4 const * const x_sigma [[ buffer(6) ]],
-							 constant uint const & length [[ buffer(7) ]],
-							 uint const n [[ thread_position_in_grid ]]) {
-	uint4 const ofs = uint4(0, 1, 2, 3);
-	uint4 const idx = 4 * n + ofs;
-	bool4 const can = idx < length;
-	if ( can.x ) {
-		int const k = idx.x;
-		float4x4 w = weight[k];
-		y_value[k] += mul(w, x_value[k]);
-		y_mu[k] += mul(w, x_mu[k]);
-		y_sigma[k] += sq(mul(w, x_sigma[k]));
-	}
-	if ( can.y ) {
-		int const k = idx.y;
-		float4x4 const w = weight[k];
-		y_value[k] += mul(w, x_value[k]);
-		y_mu[k] += mul(w, x_mu[k]);
-		y_sigma[k] += sq(mul(w, x_sigma[k]));
-	}
-	if ( can.z ) {
-		int const k = idx.z;
-		float4x4 const w = weight[k];
-		y_value[k] += mul(w, x_value[k]);
-		y_mu[k] += mul(w, x_mu[k]);
-		y_sigma[k] += sq(mul(w, x_sigma[k]));
-	}
-	if ( can.w ) {
-		int const k = idx.w;
-		float4x4 const w = weight[k];
-		y_value[k] += mul(w, x_value[k]);
-		y_mu[k] += mul(w, x_mu[k]);
-		y_sigma[k] += sq(mul(w, x_sigma[k]));
-	}
+kernel void GaussCollectC(device float4x4 * const y_value [[ buffer(0) ]],
+						  device float4x4 * const y_mu [[ buffer(1) ]],
+						  device float4x4 * const y_sigma [[ buffer(2) ]],
+						  device float4x4 const * const x_value [[ buffer(3) ]],
+						  device float4x4 const * const x_mu [[ buffer(4) ]],
+						  device float4x4 const * const x_sigma [[ buffer(5) ]],
+						  uint const n [[ thread_position_in_grid ]]) {
+	int const idx = n;
+	float4x4 const s = x_sigma[idx];
+	y_sigma[idx] += float4x4(s[0]*s[0],
+							 s[1]*s[1],
+							 s[2]*s[2],
+							 s[3]*s[3]);
+	y_mu[idx] += x_mu[idx];
+	y_value[idx] += x_value[idx];
 }
-kernel void GaussCollectBias(device float4x4 * const y_value [[ buffer(0) ]],
-							 device float4x4 * const y_mu [[ buffer(1) ]],
-							 device float4x4 * const y_sigma [[ buffer(2) ]],
-							 device float4x4 const * const x_value [[ buffer(3) ]],
-							 device float4x4 const * const x_mu [[ buffer(4) ]],
-							 device float4x4 const * const x_sigma [[ buffer(5) ]],
-							 constant uint const & length [[ buffer(6) ]],
-							 uint const n [[ thread_position_in_grid ]]) {
-	uint4 const ofs = uint4(0, 1, 2, 3);
-	uint4 const idx = 4 * n + ofs;
-	bool4 const can = idx < length;
-	if ( can.x ) {
-		int const k = idx.x;
-		y_value[k] += x_value[k];
-		y_mu[k] += x_mu[k];
-		y_sigma[k] += sq(x_sigma[k]);
-	}
-	if ( can.y ) {
-		int const k = idx.y;
-		float4x4 const xs = x_sigma[k];
-		y_value[k] += x_value[k];
-		y_mu[k] += x_mu[k];
-		y_sigma[k] += sq(x_sigma[k]);
-	}
-	if ( can.z ) {
-		int const k = idx.z;
-		y_value[k] += x_value[k];
-		y_mu[k] += x_mu[k];
-		y_sigma[k] += sq(x_sigma[k]);
-	}
-	if ( can.w ) {
-		int const k = idx.w;
-		y_value[k] += x_value[k];
-		y_mu[k] += x_mu[k];
-		y_sigma[k] += sq(x_sigma[k]);
-	}
+kernel void GaussCollectD(device float4x4 * const y_value [[ buffer(0) ]],
+						  device float4x4 * const y_mu [[ buffer(1) ]],
+						  device float4x4 * const y_sigma [[ buffer(2) ]],
+						  device float4x4 const * const weight [[ buffer(3) ]],
+						  device float4x4 const * const x_value [[ buffer(4) ]],
+						  device float4x4 const * const x_mu [[ buffer(5) ]],
+						  device float4x4 const * const x_sigma [[ buffer(6) ]],
+						  constant uint const & length [[ buffer(7) ]],
+						  uint const n [[ thread_position_in_grid ]]) {
+	int const k = n;
+	float4x4 const w = weight[k];
+	float4x4 const v = x_value[k];
+	float4x4 const m = x_mu[k];
+	float4x4 const s = x_sigma[k];
+	y_value[k] += float4x4(w[0]*v[0],
+						   w[1]*v[1],
+						   w[2]*v[2],
+						   w[3]*v[3]);
+	y_mu[k] += float4x4(w[0]*m[0],
+						w[1]*m[1],
+						w[2]*m[2],
+						w[3]*m[3]);
+	y_sigma[k] += float4x4(s[0]*s[0]*w[0]*w[0],
+						   s[1]*s[1]*w[1]*w[1],
+						   s[2]*s[2]*w[2]*w[2],
+						   s[3]*s[3]*w[3]*w[3]);
 }
 /*
 kernel void GaussGradient(device float2x4 * const g [[ buffer(0) ]],
@@ -525,4 +570,7 @@ inline float4x4 mul(float4x4 x, float4x4 y) {
 }
 inline float4x4 div(float4x4 x, float4x4 y) {
 	return float4x4(x[0]/y[0], x[1]/y[1], x[2]/y[2], x[3]/y[3]);
+}
+inline float4x4 rsqrt(float4x4 const x) {
+	return float4x4(rsqrt(x[0]), rsqrt(x[1]), rsqrt(x[2]), rsqrt(x[3]));
 }

@@ -25,7 +25,6 @@
 		870C4C821E3D63A500AF6DE7 /* Distributor.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 870C4C791E3D63A500AF6DE7 /* Distributor.framework */; };
 		870C4C891E3D63A500AF6DE7 /* DistributorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 870C4C881E3D63A500AF6DE7 /* DistributorTests.swift */; };
 		870C4C8B1E3D63A500AF6DE7 /* Distributor.h in Headers */ = {isa = PBXBuildFile; fileRef = 870C4C7B1E3D63A500AF6DE7 /* Distributor.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		870C4C8E1E3D63A500AF6DE7 /* Distributor.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 870C4C791E3D63A500AF6DE7 /* Distributor.framework */; };
 		870C4C8F1E3D63A500AF6DE7 /* Distributor.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 870C4C791E3D63A500AF6DE7 /* Distributor.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		870C4C9B1E3D63B200AF6DE7 /* Cauchy.metal in Sources */ = {isa = PBXBuildFile; fileRef = 870C4C961E3D63B200AF6DE7 /* Cauchy.metal */; };
 		870C4C9C1E3D63B200AF6DE7 /* Cauchy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 870C4C971E3D63B200AF6DE7 /* Cauchy.swift */; };
@@ -93,13 +92,6 @@
 			proxyType = 1;
 			remoteGlobalIDString = 870C4B971E3CB0F700AF6DE7;
 			remoteInfo = Stage;
-		};
-		870C4C8C1E3D63A500AF6DE7 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 875931481E3B40C5006B60FF /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 870C4C781E3D63A500AF6DE7;
-			remoteInfo = Distributor;
 		};
 		8740ED631E41C63F00D6B6B1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -198,7 +190,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				8740ED6E1E41C63F00D6B6B1 /* Optimizer.framework in Frameworks */,
-				870C4C8E1E3D63A500AF6DE7 /* Distributor.framework in Frameworks */,
 				870C4BD01E3CB10500AF6DE7 /* Computer.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -297,10 +288,10 @@
 		870C4BBC1E3CB10500AF6DE7 /* Computer */ = {
 			isa = PBXGroup;
 			children = (
-				870C4BDB1E3CB11100AF6DE7 /* NonLinear.metal */,
 				870C4BDC1E3CB11100AF6DE7 /* NonLinear.swift */,
-				870C4BDA1E3CB11100AF6DE7 /* Linear.metal */,
+				870C4BDB1E3CB11100AF6DE7 /* NonLinear.metal */,
 				870C4C381E3CBB8000AF6DE7 /* Linear.swift */,
+				870C4BDA1E3CB11100AF6DE7 /* Linear.metal */,
 				870C4BD91E3CB11100AF6DE7 /* Computer.swift */,
 				870C4BBD1E3CB10500AF6DE7 /* Computer.h */,
 				870C4BBE1E3CB10500AF6DE7 /* Info.plist */,
@@ -320,10 +311,10 @@
 		870C4C7A1E3D63A500AF6DE7 /* Distributor */ = {
 			isa = PBXGroup;
 			children = (
-				870C4C961E3D63B200AF6DE7 /* Cauchy.metal */,
 				870C4C971E3D63B200AF6DE7 /* Cauchy.swift */,
-				870C4C991E3D63B200AF6DE7 /* Gauss.metal */,
+				870C4C961E3D63B200AF6DE7 /* Cauchy.metal */,
 				870C4C9A1E3D63B200AF6DE7 /* Gauss.swift */,
+				870C4C991E3D63B200AF6DE7 /* Gauss.metal */,
 				870C4C981E3D63B200AF6DE7 /* Distributior.swift */,
 				870C4C7B1E3D63A500AF6DE7 /* Distributor.h */,
 				870C4C7C1E3D63A500AF6DE7 /* Info.plist */,
@@ -428,7 +419,6 @@
 			);
 			dependencies = (
 				870C4BCF1E3CB10500AF6DE7 /* PBXTargetDependency */,
-				870C4C8D1E3D63A500AF6DE7 /* PBXTargetDependency */,
 				8740ED6D1E41C63F00D6B6B1 /* PBXTargetDependency */,
 			);
 			name = Stage;
@@ -825,11 +815,6 @@
 			isa = PBXTargetDependency;
 			target = 870C4B971E3CB0F700AF6DE7 /* Stage */;
 			targetProxy = 870C4C851E3D63A500AF6DE7 /* PBXContainerItemProxy */;
-		};
-		870C4C8D1E3D63A500AF6DE7 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 870C4C781E3D63A500AF6DE7 /* Distributor */;
-			targetProxy = 870C4C8C1E3D63A500AF6DE7 /* PBXContainerItemProxy */;
 		};
 		8740ED641E41C63F00D6B6B1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;

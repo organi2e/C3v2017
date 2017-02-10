@@ -2,10 +2,9 @@
 //  DistributorTests.swift
 //  DistributorTests
 //
-//  Created by Kota Nakano on 1/29/17.
+//  Created by Kota Nakano on 2017/01/27.
 //
 //
-
 
 import Accelerate
 import XCTest
@@ -28,7 +27,7 @@ class DistributorTests: XCTestCase {
 			let queue: MTLCommandQueue = device.makeCommandQueue()
 			let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
 			
-			distributor.encode(commandBuffer: commandBuffer, CDF: χ, μ: μ, σ: σ, count: count)
+			distributor.compute(commandBuffer: commandBuffer, cdf: χ, of: (μ: μ, σ: σ), count: count)
 			
 			commandBuffer.commit()
 			commandBuffer.waitUntilCompleted()
@@ -74,7 +73,7 @@ class DistributorTests: XCTestCase {
 			let queue: MTLCommandQueue = device.makeCommandQueue()
 			let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
 			
-			distributor.encode(commandBuffer: commandBuffer, PDF: χ, μ: μ, σ: σ, count: count)
+			distributor.compute(commandBuffer: commandBuffer, pdf: χ, of: (μ: μ, σ: σ), count: count)
 			
 			commandBuffer.commit()
 			commandBuffer.waitUntilCompleted()
@@ -107,7 +106,7 @@ class DistributorTests: XCTestCase {
 	func testGaussRNG() {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
 		do {
-			let count: Int = 1024 * 1024 * 16
+			let count: Int = 1024 * 16
 			
 			let distributor: Distributor = try Gauss(device: device)
 			
@@ -126,7 +125,7 @@ class DistributorTests: XCTestCase {
 			measure {
 				for _ in 0..<256 {
 					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-					distributor.encode(commandBuffer: commandBuffer, χ: χ, μ: μ, σ: σ, count: count)
+					distributor.shuffle(commandBuffer: commandBuffer, χ: χ, from: (μ: μ, σ: σ), count: count)
 					commandBuffer.commit()
 				}
 				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
@@ -143,7 +142,88 @@ class DistributorTests: XCTestCase {
 			XCTFail(String(describing: error))
 		}
 	}
-	
+	func testCollectBias() {
+		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
+		do {
+			let distributor: Distributor = try Gauss(device: device)
+			
+			let hint: la_hint_t = la_hint_t(LA_ATTRIBUTE_ENABLE_LOGGING)
+			let attr: la_attribute_t = la_attribute_t(LA_DEFAULT_ATTRIBUTES)
+			let norm: la_norm_t = la_norm_t(LA_L2_NORM)
+			
+			let rows: Int = 1024
+			let cols: Int = 1
+			
+			let Σ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) = (
+				χ: device.makeBuffer(length: MemoryLayout<Float>.size*rows, options: .storageModeShared),
+				μ: device.makeBuffer(length: MemoryLayout<Float>.size*rows, options: .storageModeShared),
+				σ: device.makeBuffer(length: MemoryLayout<Float>.size*rows, options: .storageModeShared)
+			)
+			let b: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) = (
+				χ: device.makeBuffer(length: MemoryLayout<Float>.size*rows*cols, options: .storageModeShared),
+				μ: device.makeBuffer(length: MemoryLayout<Float>.size*rows*cols, options: .storageModeShared),
+				σ: device.makeBuffer(length: MemoryLayout<Float>.size*rows*cols, options: .storageModeShared)
+			)
+			
+			vDSP_vclr(Σ.χ.ref, 1, vDSP_Length(rows))
+			vDSP_vclr(Σ.μ.ref, 1, vDSP_Length(rows))
+			vDSP_vclr(Σ.σ.ref, 1, vDSP_Length(rows))
+			
+			[b.χ, b.μ, b.σ].forEach {
+				let count: Int = $0.length / MemoryLayout<Float>.size
+				arc4random_buf($0.ref, $0.length)
+				vDSP_vflt32(UnsafePointer<Int32>(OpaquePointer($0.ref)), 1, $0.ref, 1, vDSP_Length(count))
+				vDSP_vsmul($0.ref, 1, [1.0/Float(65536)], $0.ref, 1, vDSP_Length(count))
+				vDSP_vsmul($0.ref, 1, [1.0/Float(65536)], $0.ref, 1, vDSP_Length(count))
+			}
+			
+			let Σmat: (χ: la_object_t, μ: la_object_t, σ: la_object_t) = (
+				χ: la_matrix_from_float_buffer_nocopy(Σ.χ.ref, la_count_t(rows), la_count_t(1), la_count_t(1), hint, nil, attr),
+				μ: la_matrix_from_float_buffer_nocopy(Σ.μ.ref, la_count_t(rows), la_count_t(1), la_count_t(1), hint, nil, attr),
+				σ: la_matrix_from_float_buffer_nocopy(Σ.σ.ref, la_count_t(rows), la_count_t(1), la_count_t(1), hint, nil, attr)
+			)
+			
+			let bmat: (χ: la_object_t, μ: la_object_t, σ: la_object_t) = (
+				χ: la_matrix_from_float_buffer_nocopy(b.χ.ref, la_count_t(rows), la_count_t(1), la_count_t(1), hint, nil, attr),
+				μ: la_matrix_from_float_buffer_nocopy(b.μ.ref, la_count_t(rows), la_count_t(1), la_count_t(1), hint, nil, attr),
+				σ: la_matrix_from_float_buffer_nocopy(b.σ.ref, la_count_t(rows), la_count_t(1), la_count_t(1), hint, nil, attr)
+			)
+			
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+			distributor.collect(commandBuffer: commandBuffer, Σ: Σ, b: b, count: rows)
+			commandBuffer.commit()
+			commandBuffer.waitUntilCompleted()
+			
+			let χrmse: Float = la_norm_as_float(la_difference(Σmat.χ, bmat.χ), norm)
+			let μrmse: Float = la_norm_as_float(la_difference(Σmat.μ, bmat.μ), norm)
+			let σrmse: Float = la_norm_as_float(la_difference(Σmat.σ, la_elementwise_product(bmat.σ, bmat.σ)), norm)
+			
+			print("error", χrmse, μrmse, σrmse)
+			
+			measure {
+				for _ in 0..<256 {
+					if true {
+						let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+						distributor.collect(commandBuffer: commandBuffer, Σ: Σ, b: b, count: rows)
+						commandBuffer.commit()
+					} else {
+						la_matrix_to_float_buffer(Σ.χ.ref, la_count_t(1), bmat.χ)
+						la_matrix_to_float_buffer(Σ.μ.ref, la_count_t(1), bmat.μ)
+						la_matrix_to_float_buffer(Σ.σ.ref, la_count_t(1), la_elementwise_product(bmat.σ, bmat.σ))
+					}
+				}
+				if true {
+					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+					commandBuffer.commit()
+					commandBuffer.waitUntilCompleted()
+				}
+			}
+			
+		} catch {
+			XCTFail(String(describing: error))
+		}
+	}
 	func testGaussChain() {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
 		do {
@@ -207,29 +287,24 @@ class DistributorTests: XCTestCase {
 			
 			print("error", χrmse, μrmse, σrmse)
 			
-			try Σ.σ.write(to: URL(fileURLWithPath: "/tmp/gpu.raw"))
-			try la_matrix_product(la_elementwise_product(wmat.σ, wmat.σ), la_elementwise_product(χmat, χmat)).write(to: URL(fileURLWithPath: "/tmp/cpu.raw"))
-			
-			/*
 			measure {
-			for _ in 0..<256 {
-			if true {
-			let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-			distributor.collect(commandBuffer: commandBuffer, Σ: Σ, w: w, x: χ, count: count)
-			commandBuffer.commit()
-			} else {
-			la_matrix_to_float_buffer(Σχref, la_count_t(1), la_matrix_product(wmat.χ, χmat))
-			la_matrix_to_float_buffer(Σμref, la_count_t(1), la_matrix_product(wmat.μ, χmat))
-			la_matrix_to_float_buffer(Σσref, la_count_t(1), la_matrix_product(la_elementwise_product(wmat.σ, wmat.σ), la_elementwise_product(χmat, χmat)))
+				for _ in 0..<256 {
+					if false {
+						let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+						distributor.collect(commandBuffer: commandBuffer, Σ: Σ, w: w, x: χ, count: count)
+						commandBuffer.commit()
+					} else {
+						la_matrix_to_float_buffer(Σ.χ.ref, la_count_t(1), la_matrix_product(wmat.χ, χmat))
+						la_matrix_to_float_buffer(Σ.μ.ref, la_count_t(1), la_matrix_product(wmat.μ, χmat))
+						la_matrix_to_float_buffer(Σ.σ.ref, la_count_t(1), la_matrix_product(la_elementwise_product(wmat.σ, wmat.σ), la_elementwise_product(χmat, χmat)))
+					}
+				}
+				if false {
+					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+					commandBuffer.commit()
+					commandBuffer.waitUntilCompleted()
+				}
 			}
-			}
-			if true {
-			let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-			commandBuffer.commit()
-			commandBuffer.waitUntilCompleted()
-			}
-			}
-			*/
 			
 		} catch {
 			XCTFail(String(describing: error))

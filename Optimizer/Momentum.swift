@@ -35,18 +35,16 @@ public class Momentum {
 	}
 }
 extension Momentum: Optimizer {
-	public func encode(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δθ: MTLBuffer) {
-		
-		let length: Int = parameters.length
-		
-		assert(length<=θ.length)
-		assert(length<=Δθ.length)
+	public func optimize(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δ: MTLBuffer) {
+
+		assert(parameters.length<=θ.length)
+		assert(parameters.length<=Δ.length)
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
 		encoder.setComputePipelineState(pipeline)
 		encoder.setBuffer(θ, offset: 0, at: 0)
 		encoder.setBuffer(parameters, offset: 0, at: 1)
-		encoder.setBuffer(Δθ, offset: 0, at: 2)
+		encoder.setBuffer(Δ, offset: 0, at: 2)
 		encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
 		encoder.endEncoding()
 		

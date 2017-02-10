@@ -12,8 +12,8 @@ import Metal
 import Computer
 
 class ComputerTests: XCTestCase {
-	let N: Int = 1024
-	let K: Int = 16
+	let N: Int = 1024 * 1024
+	let K: Int = 256
 	func testGPU() {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
 		do {
@@ -24,7 +24,7 @@ class ComputerTests: XCTestCase {
 			let z: Buffer = computer.make(length: N*MemoryLayout<Float>.size, options: .storageModeShared)
 			let xref: UnsafeMutablePointer<Float> = UnsafeMutablePointer<Float>(OpaquePointer(x.contents()))
 			let yref: UnsafeMutablePointer<Float> = UnsafeMutablePointer<Float>(OpaquePointer(y.contents()))
-			let zref: UnsafeMutablePointer<Float> = UnsafeMutablePointer<Float>(OpaquePointer(z.contents()))
+			//let zref: UnsafeMutablePointer<Float> = UnsafeMutablePointer<Float>(OpaquePointer(z.contents()))
 			let range: Range<Int> = 0..<K
 			/*
 			arc4random_buf(y.contents(), MemoryLayout<Float>.size*N)
@@ -35,7 +35,7 @@ class ComputerTests: XCTestCase {
 			*/
 			vDSP_vfill([Float(10.0)], xref, 1, vDSP_Length(N))
 			vDSP_vfill([Float(-1.5)], yref, 1, vDSP_Length(N))
-			print("before", zref[N-1])
+			print("before", yref[N-1])
 			measure {
 				for _ in range.lowerBound..<range.upperBound {
 					computer.sigm(y: y, x: x, count: count)
@@ -43,7 +43,7 @@ class ComputerTests: XCTestCase {
 				}
 			}
 			computer.wait()
-			print("after", zref[N-1])
+			print("after", yref[N-1])
 		} catch {
 			XCTFail(String(describing: error))
 		}
@@ -51,7 +51,7 @@ class ComputerTests: XCTestCase {
 	func testCPU() {
 		let xref: UnsafeMutablePointer<Float> = UnsafeMutablePointer<Float>.allocate(capacity: N)
 		let yref: UnsafeMutablePointer<Float> = UnsafeMutablePointer<Float>.allocate(capacity: N)
-		let zref: UnsafeMutablePointer<Float> = UnsafeMutablePointer<Float>.allocate(capacity: N)
+		//let zref: UnsafeMutablePointer<Float> = UnsafeMutablePointer<Float>.allocate(capacity: N)
 		var count: Int32 = Int32(N)
 		var one: Float = 1.0
 		let range: Range<Int> = 0..<K
@@ -64,7 +64,7 @@ class ComputerTests: XCTestCase {
 		*/
 		vDSP_vfill([Float(10.0)], xref, 1, vDSP_Length(N))
 		vDSP_vfill([Float(-1.5)], yref, 1, vDSP_Length(N))
-		print("before", zref[N-1])
+		print("before", yref[N-1])
 		measure {
 			for _ in range.lowerBound..<range.upperBound {
 				//vDSP_vmul(xref, 1, yref, 1, zref, 1, vDSP_Length(count))
@@ -76,8 +76,8 @@ class ComputerTests: XCTestCase {
 				//*/
 			}
 		}
-		print("after", zref[N-1])
-		zref.deallocate(capacity: N)
+		print("after", yref[N-1])
+		//zref.deallocate(capacity: N)
 		yref.deallocate(capacity: N)
 		xref.deallocate(capacity: N)
 	}

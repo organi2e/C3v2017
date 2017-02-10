@@ -9,6 +9,7 @@
 import Metal
 
 public protocol Optimizer {
-	func encode(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δθ: MTLBuffer)
+	func optimize(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δ: MTLBuffer)
 	func reset(commandBuffer: MTLCommandBuffer)
 }
+public typealias OptimizerFactory = (MTLDevice) throws -> (Int) -> Optimizer

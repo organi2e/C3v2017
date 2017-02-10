@@ -59,20 +59,25 @@ class OptimizerTests: XCTestCase {
 			guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
 			let optimizer: Optimizer = try factory(device)(count)
 			
-			let gradient: MTLComputePipelineState = try prepare(device: device, name: "dydx")
+			let gradientS: MTLComputePipelineState = try prepare(device: device, name: "dydx")
+			let gradientN: MTLComputePipelineState = try prepare(device: device, name: "dydx2")
 			let θ: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
 			let Δθ: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
 			let queue: MTLCommandQueue = device.makeCommandQueue()
 			//uniform(x: θ)
-			(0..<16384).forEach { (_) in
+			(0..<2048).forEach { (_) in
 				do {
 					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-					apply(commandBuffer: commandBuffer, pipeline: gradient, dydx: Δθ, x: θ)
+					if drand48() < 0.0 {
+						apply(commandBuffer: commandBuffer, pipeline: gradientN, dydx: Δθ, x: θ)
+					} else {
+						apply(commandBuffer: commandBuffer, pipeline: gradientS, dydx: Δθ, x: θ)
+					}
 					commandBuffer.commit()
 				}
 				do {
 					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-					optimizer.encode(commandBuffer: commandBuffer, θ: θ, Δθ: Δθ)
+					optimizer.optimize(commandBuffer: commandBuffer, θ: θ, Δ: Δθ)
 					commandBuffer.commit()
 				}
 			}
@@ -92,7 +97,7 @@ class OptimizerTests: XCTestCase {
 		optimizerTests(factory: AdaDelta.factory())
 	}
 	func testAdam() {
-		optimizerTests(factory: Adam.factory())
+		optimizerTests(factory: Adam.factory(α: 1, ε: 1e-8))
 	}
 	func testMomentum() {
 		optimizerTests(factory: Momentum.factory(η: 1e-3, γ: 0.9))

@@ -24,6 +24,7 @@ extension Arcane {
 	private static let locationkey: String = "location"
 	private static let logscalekey: String = "logscale"
 	internal func update() {
+		/*
 		context.mul(Δσ, Δσ, σ, count)
 		func block(commandBuffer: CommandBuffer) {
 			func willChange(_: CommandBuffer) {
@@ -34,24 +35,26 @@ extension Arcane {
 				didChangeValue(forKey: type(of: self).locationkey)
 				didChangeValue(forKey: type(of: self).logscalekey)
 			}
-			μoptimizer.encode(commandBuffer: commandBuffer, θ: μ, Δθ: Δμ)
-			σoptimizer.encode(commandBuffer: commandBuffer, θ: σ, Δθ: Δσ)
+			μoptimizer.optimize(commandBuffer: commandBuffer, θ: μ, Δ: Δμ)
+			σoptimizer.optimize(commandBuffer: commandBuffer, θ: σ, Δ: Δσ)
 			commandBuffer.addScheduledHandler(willChange)
 			commandBuffer.addCompletedHandler(didChange)
 		}
 		context.compute(block)
+		*/
 	}
-	internal func refresh() {
-		context.exp(σ, logσ, count)
+	internal func refresh(commandBuffer: MTLCommandBuffer) {
+		context.computer.exp(commandBuffer: commandBuffer, y: σ, x: logσ, count: count)
 	}
 	internal func setup() {
-		μoptimizer = context.make(count: count)
-		σoptimizer = context.make(count: count)
+//		μoptimizer = context.make(count: count)
+//		σoptimizer = context.make(count: count)
+		χ = context.make(length: length, options: .storageModePrivate)
+		σ = context.make(length: length, options: .storageModePrivate)
+		Δμ = context.make(length: length, options: .storageModePrivate)
+		Δσ = context.make(length: length, options: .storageModePrivate)
 		μ = context.make(data: location, options: .storageModeShared)
 		logσ = context.make(data: logscale, options: .storageModeShared)
-		σ = context.make(length: logscale.count, options: .storageModePrivate)
-		Δμ = context.make(length: location.count, options: .storageModePrivate)
-		Δσ = context.make(length: logscale.count, options: .storageModePrivate)
 		setPrimitiveValue(Data(bytesNoCopy: μ.contents(), count: location.count, deallocator: .none), forKey: type(of: self).locationkey)
 		setPrimitiveValue(Data(bytesNoCopy: logσ.contents(), count: logscale.count, deallocator: .none), forKey: type(of: self).logscalekey)
 	}
@@ -67,8 +70,14 @@ extension Arcane {
 	}
 }
 extension Arcane {
-	var count: Int {
-		return min(location.count, logscale.count) / MemoryLayout<Float>.size
+	internal var count: Int {
+		return length / MemoryLayout<Float>.size
+	}
+	internal var length: Int {
+		return min(location.count, logscale.count)
+	}
+	internal var value: (χ: Buffer, μ: Buffer, σ: Buffer) {
+		return (χ: χ, μ: μ, σ: σ)
 	}
 }
 extension Arcane {
