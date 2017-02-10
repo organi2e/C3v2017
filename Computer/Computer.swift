@@ -23,6 +23,8 @@ final public class Computer {
 	let sign: ComputePipelineState
 	let sigm: ComputePipelineState
 	
+	let step: ComputePipelineState
+	
 	let gemv16: ComputePipelineState
 	let gemm16: ComputePipelineState
 	
@@ -41,6 +43,8 @@ final public class Computer {
 		
 		sign = try library.make(name: "sign")
 		sigm = try library.make(name: "sigm")
+		
+		step = try library.make(name: "step")
 		
 		gemv16 = try library.make(name: "gemv16")
 		gemm16 = try library.make(name: "gemv16")
@@ -93,7 +97,10 @@ extension Computer {
 	public func make(length: Int, options: ResourceOptions) -> Buffer {
 		return queue.device.makeBuffer(length: length, options: options)
 	}
-	public func make(data: Data, options: MTLResourceOptions) -> Buffer {
+	public func make<T>(array: Array<T>, options: ResourceOptions) -> Buffer {
+		return device.makeBuffer(bytes: array, length: array.count*MemoryLayout<T>.size, options: options)
+	}
+	public func make(data: Data, options: ResourceOptions) -> Buffer {
 		let cache: Array<UInt8> = Array<UInt8>(repeating: 0, count: data.count)
 		data.copyBytes(to: UnsafeMutablePointer<UInt8>(mutating: cache), count: cache.count)
 		return queue.device.makeBuffer(bytes: cache, length: cache.count, options: options)

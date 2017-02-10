@@ -58,24 +58,6 @@ public class Context: NSManagedObjectContext {
 	}
 }
 extension Context {
-	var clr: ([Buffer]) -> Void {
-		return computer.zero
-	}
-	var log: (Buffer, Buffer, Int) -> Void {
-		return computer.log
-	}
-	var exp: (Buffer, Buffer, Int) -> Void {
-		return computer.exp
-	}
-	var add: (Buffer, Buffer, Buffer, Int) -> Void {
-		return computer.add
-	}
-	var mul: (Buffer, Buffer, Buffer, Int) -> Void {
-		return computer.mul
-	}
-	var compute: ((CommandBuffer) -> Void) -> Void {
-		return computer.compute
-	}
 }
 extension Context {
 	internal func make(count: Int) -> Optimizer {
@@ -83,6 +65,9 @@ extension Context {
 	}
 	internal func make() -> CommandBuffer {
 		return computer.make()
+	}
+	internal func make<T>(array: Array<T>, options: ResourceOptions = []) -> Buffer {
+		return computer.make(array: array, options: options)
 	}
 	internal func make(data: Data, options: ResourceOptions = []) -> Buffer {
 		return computer.make(data: data, options: options)

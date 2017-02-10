@@ -23,36 +23,31 @@ public class Arcane: ManagedObject {
 extension Arcane {
 	private static let locationkey: String = "location"
 	private static let logscalekey: String = "logscale"
-	internal func update() {
-		/*
-		context.mul(Δσ, Δσ, σ, count)
-		func block(commandBuffer: CommandBuffer) {
-			func willChange(_: CommandBuffer) {
-				willChangeValue(forKey: type(of: self).locationkey)
-				willChangeValue(forKey: type(of: self).logscalekey)
-			}
-			func didChange(_: CommandBuffer) {
-				didChangeValue(forKey: type(of: self).locationkey)
-				didChangeValue(forKey: type(of: self).logscalekey)
-			}
-			μoptimizer.optimize(commandBuffer: commandBuffer, θ: μ, Δ: Δμ)
-			σoptimizer.optimize(commandBuffer: commandBuffer, θ: σ, Δ: Δσ)
-			commandBuffer.addScheduledHandler(willChange)
-			commandBuffer.addCompletedHandler(didChange)
+	internal func update(commandBuffer: MTLCommandBuffer) {
+		func willChange(_: CommandBuffer) {
+			willChangeValue(forKey: type(of: self).locationkey)
+			willChangeValue(forKey: type(of: self).logscalekey)
 		}
-		context.compute(block)
-		*/
+		func didChange(_: CommandBuffer) {
+			didChangeValue(forKey: type(of: self).locationkey)
+			didChangeValue(forKey: type(of: self).logscalekey)
+		}
+		context.computer.mul(commandBuffer: commandBuffer, z: Δσ, y: Δσ, x: σ, count: count)
+		commandBuffer.addScheduledHandler(willChange)
+		μoptimizer.optimize(commandBuffer: commandBuffer, θ: μ, Δ: Δμ)
+		σoptimizer.optimize(commandBuffer: commandBuffer, θ: σ, Δ: Δσ)
+		commandBuffer.addCompletedHandler(didChange)
 	}
 	internal func refresh(commandBuffer: MTLCommandBuffer) {
 		context.computer.exp(commandBuffer: commandBuffer, y: σ, x: logσ, count: count)
 	}
 	internal func setup() {
-//		μoptimizer = context.make(count: count)
-//		σoptimizer = context.make(count: count)
-		χ = context.make(length: length, options: .storageModePrivate)
-		σ = context.make(length: length, options: .storageModePrivate)
-		Δμ = context.make(length: length, options: .storageModePrivate)
-		Δσ = context.make(length: length, options: .storageModePrivate)
+		μoptimizer = context.make(count: count)
+		σoptimizer = context.make(count: count)
+		χ = context.make(length: length, options: .storageModeShared)
+		σ = context.make(length: length, options: .storageModeShared)
+		Δμ = context.make(length: length, options: .storageModeShared)
+		Δσ = context.make(length: length, options: .storageModeShared)
 		μ = context.make(data: location, options: .storageModeShared)
 		logσ = context.make(data: logscale, options: .storageModeShared)
 		setPrimitiveValue(Data(bytesNoCopy: μ.contents(), count: location.count, deallocator: .none), forKey: type(of: self).locationkey)

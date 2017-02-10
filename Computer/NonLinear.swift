@@ -42,6 +42,22 @@ extension Computer {
 		encoder.dispatchThreadgroups(MTLSize(width: (count-1)/16+1, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
 		encoder.endEncoding()
 	}
+	public func step(commandBuffer: MTLCommandBuffer, y: Buffer, x: Buffer, count: Int) {
+		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		encoder.setComputePipelineState(step)
+		encoder.setBuffer(y, offset: 0, at: 0)
+		encoder.setBuffer(x, offset: 0, at: 1)
+		encoder.dispatchThreadgroups(MTLSize(width: (count-1)/16+1, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+		encoder.endEncoding()
+	}
+	public func sign(commandBuffer: MTLCommandBuffer, y: Buffer, x: Buffer, count: Int) {
+		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		encoder.setComputePipelineState(sign)
+		encoder.setBuffer(y, offset: 0, at: 0)
+		encoder.setBuffer(x, offset: 0, at: 1)
+		encoder.dispatchThreadgroups(MTLSize(width: (count-1)/16+1, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+		encoder.endEncoding()
+	}
 	public func exp(y: Buffer, x: Buffer, count: Int) {
 		invoke(y: y, x: x, count: count, pipeline: exp, vForce: vvexpf)
 	}

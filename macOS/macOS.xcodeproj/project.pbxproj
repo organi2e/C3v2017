@@ -346,8 +346,8 @@
 				8740ED521E41A0B400D6B6B1 /* Feedback.swift */,
 				87E979451E3EF9610074F799 /* RingBuffer.swift */,
 				8759319D1E3B5CDD006B60FF /* Context.swift */,
-				8759319A1E3B5CB6006B60FF /* C³.xcdatamodeld */,
 				875931851E3B5C82006B60FF /* C³.h */,
+				8759319A1E3B5CB6006B60FF /* C³.xcdatamodeld */,
 				875931861E3B5C82006B60FF /* Info.plist */,
 			);
 			path = "C³";

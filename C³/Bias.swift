@@ -33,6 +33,12 @@ extension Bias {
 		        σ: distributor.σ(make(nocopy: σ.contents(), rows: width, cols: 1))
 		)
 	}
+	internal func correct_clear(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
+	
+	}
+	internal func correct(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
+		
+	}
 }
 extension Context {
 	@nonobjc internal func make(cell: Cell) throws -> Bias {

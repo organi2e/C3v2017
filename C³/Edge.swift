@@ -30,6 +30,13 @@ extension Edge {
 		        σ: matrix_product(distributor.σ(make(nocopy: σ.contents(), rows: rows, cols: cols)), distributor.σ(state))
 		)
 	}
+	internal func correct_clear(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
+		output.correct_clear(ignore: ignore)
+	}
+	internal func correct(commandBuffer: CommandBuffer, ignore: Set<Cell>) -> LaObjet {
+		let(Δμ, Δσ) = output.correct(ignore: ignore)
+		return Δμ
+	}
 	/*
 	internal func collect_clear(distributor: Distributor, ignore: Set<Cell>) {
 		input.collect_clear(ignore: ignore)

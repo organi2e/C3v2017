@@ -32,22 +32,25 @@ kernel void log(device float4x4 * const y [[ buffer(0) ]],
 	if ( can.z ) { float4x4 const v = x[idx.w]; y[idx.z] = float4x4(log(v[0]), log(v[1]), log(v[2]), log(v[3]));}
 	if ( can.w ) { float4x4 const v = x[idx.z]; y[idx.w] = float4x4(log(v[0]), log(v[1]), log(v[2]), log(v[3]));}
 }
+kernel void step(device float4x4 * const y [[ buffer(0) ]],
+				 device float4x4 const * const x [[ buffer(1) ]],
+				 uint const n [[ thread_position_in_grid ]]) {
+	int const idx = n;
+	float4x4 const v = x[idx];
+	y[idx] = float4x4(step(0.0, v[0]),
+					  step(0.0, v[1]),
+					  step(0.0, v[2]),
+					  step(0.0, v[3]));
+}
 kernel void sign(device float4x4 * const y [[ buffer(0) ]],
 				 device float4x4 const * const x [[ buffer(1) ]],
-				 constant uint const & length [[ buffer(2) ]],
 				 uint const n [[ thread_position_in_grid ]]) {
-	uint4 const ofs = uint4(0, 1, 2, 3);
-	uint4 const idx = 4 * n + ofs;
-	bool4 const can = idx < length;
-	float4x4 const a = x[idx.x];
-	float4x4 const b = x[idx.y];
-	float4x4 const c = x[idx.z];
-	float4x4 const d = x[idx.w];
-	if ( can.x ) y[idx.x] = float4x4(sign(a[ofs.x]), sign(a[ofs.y]), sign(a[ofs.z]), sign(a[ofs.w]));
-	if ( can.y ) y[idx.y] = float4x4(sign(b[ofs.x]), sign(b[ofs.y]), sign(b[ofs.z]), sign(b[ofs.w]));
-	if ( can.z ) y[idx.z] = float4x4(sign(c[ofs.x]), sign(c[ofs.y]), sign(c[ofs.z]), sign(c[ofs.w]));
-	if ( can.w ) y[idx.w] = float4x4(sign(d[ofs.x]), sign(d[ofs.y]), sign(d[ofs.z]), sign(d[ofs.w]));
-}
+	int const idx = n;
+	float4x4 const v = x[idx];
+	y[idx] = float4x4(sign(v[0]),
+					  sign(v[1]),
+					  sign(v[2]),
+					  sign(v[3]));}
 /*
  Compute sigmoid function, by tvOS sec for 1024 * 1024 * 1024 = 5.2(CPU) vs 1.4(GPU)
  */
