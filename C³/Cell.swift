@@ -18,6 +18,7 @@ public class Cell: ManagedObject {
 		case Target
 		case Adjust
 	}
+	internal var distributor: Distributor!
 	internal var ready: Set<Ready> = Set<Ready>()
 	internal var state: RingBuffer<Buffer> = RingBuffer<Buffer>()
 	internal var study: RingBuffer<Buffer> = RingBuffer<Buffer>()
@@ -40,8 +41,12 @@ extension Cell {
 			context.make(length: length, options: .storageModeShared)
 			)}
 		)
-		state = RingBuffer<Buffer>(array: array.map { context.make(length: length, options: .storageModeShared) })
-		study = RingBuffer<Buffer>(array: array.map { context.make(length: length, options: .storageModeShared) })
+		state = RingBuffer<Buffer>(array: array.map {
+			context.make(length: length, options: .storageModeShared)
+		})
+		study = RingBuffer<Buffer>(array: array.map {
+			context.make(length: length, options: .storageModeShared)
+		})
 	}
 	public override func awakeFromFetch() {
 		super.awakeFromFetch()
@@ -77,6 +82,11 @@ extension Cell {
 			
 			let commandBuffer: CommandBuffer = context.make()
 			
+			input.forEach {
+				
+				$0.collect(commandBuffer: commandBuffer, ignore: ignore.union([self]))
+			}
+			
 			let Σ: [(χ: LaObjet, μ: LaObjet, σ: LaObjet)] = input.map {
 				$0.collect(commandBuffer: commandBuffer, ignore: ignore.union([self]))
 			} + []
@@ -97,6 +107,7 @@ extension Cell {
 						
 			do {
 				let commandBuffer: CommandBuffer = context.make()
+				distributor.synthesize(commandBuffer: commandBuffer, μ: value.current.μ, σ: value.current.σ, Σμ: value.current.μ, Σσ: value.current.σ, count: width)
 				context.computer.step(commandBuffer: commandBuffer, y: state.current, x: value.current.χ, count: width)
 				commandBuffer.commit()
 			}
@@ -123,34 +134,49 @@ extension Cell {
 		commandBuffer.commit()
 		ready.remove(.Target)
 	}
-	public func correct(ignore: Set<Cell> = Set<Cell>()) -> (Δμ: LaObjet, Δσ: LaObjet) {
-		guard !ignore.contains(self) else { return (Δμ: make(nocopy: delta.previous.μ.contents(), rows: width, cols: 1),
-		                                            Δσ: make(nocopy: delta.previous.σ.contents(), rows: width, cols: 1)
+	public func correct(ignore: Set<Cell> = Set<Cell>()) -> (μ: LaObjet, σ: LaObjet) {
+		guard !ignore.contains(self) else { return (μ: make(nocopy: delta.previous.μ.contents(), rows: width, cols: 1),
+		                                            σ: make(nocopy: delta.previous.σ.contents(), rows: width, cols: 1)
 			)
 		}
 		if !ready.contains(.Adjust) {
-			let commandBuffer: CommandBuffer = context.make()
 			if ready.contains(.Target) {
+				let commandBuffer: CommandBuffer = context.make()
 				switch modes {
 				case .State:
-					
-					break
+					distributor.errorState(commandBuffer: commandBuffer, Δ: delta.current.χ, ψ: study.current, μ: value.current.μ, σ: value.current.σ, count: width)
 				case .Value:
-					assertionFailure("not implemented")
+					distributor.errorValue(commandBuffer: commandBuffer, Δ: delta.current.χ, ψ: study.current, μ: value.current.μ, σ: value.current.σ, count: width)
 				}
+				commandBuffer.commit()
 			} else {
+				let commandBuffer: CommandBuffer = context.make()
 				let zero: LaObjet = make(value: 0)
 				let Σ: LaObjet = output.map {
 					$0.correct(commandBuffer: commandBuffer, ignore: ignore.union([self]))
 				}.reduce(zero) {
 					$0.0 + $0.1
 				}
+				let Δ: Buffer = delta.current.χ
+				commandBuffer.addCompletedHandler { (_) in
+					Σ.render(to: Δ.contents())
+				}
+				commandBuffer.commit()
 			}
-			commandBuffer.commit()
+			do {
+				let commandBuffer: CommandBuffer = context.make()
+				switch modes {
+				case .State:
+					distributor.deltaState(commandBuffer: commandBuffer, Δμ: delta.current.χ, Δσ: delta.current.σ, Δ: delta.current.χ, μ: value.current.μ, σ: value.current.σ, count: width)
+				case .Value:
+					distributor.deltaValue(commandBuffer: commandBuffer, Δμ: delta.current.χ, Δσ: delta.current.σ, Δ: delta.current.χ, μ: value.current.μ, σ: value.current.σ, count: width)
+				}
+				commandBuffer.commit()
+			}
 			ready.insert(.Adjust)
 		}
-		return (Δμ: make(nocopy: delta.current.μ.contents(), rows: width, cols: 1),
-		        Δσ: make(nocopy: delta.current.σ.contents(), rows: width, cols: 1)
+		return (μ: make(nocopy: delta.current.μ.contents(), rows: width, cols: 1),
+		        σ: make(nocopy: delta.current.σ.contents(), rows: width, cols: 1)
 		)
 	}
 }
@@ -209,9 +235,6 @@ extension Cell {
 				break
 			}
 		}
-	}
-	internal var distributor: Distributor {
-		return context.gauss
 	}
 }
 extension Cell {

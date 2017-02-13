@@ -12,18 +12,25 @@ import Computer
 import Distributor
 
 internal class Bias: Arcane {
-
+	var j: RingBuffer<(μ: Buffer, σ: Buffer)> = RingBuffer<(μ: Buffer, σ: Buffer)>()
 }
 extension Bias {
 	@NSManaged var cell: Cell
 }
 extension Bias {
 	override func setup() {
+		let length: Int = cell.width * cell.width * MemoryLayout<Float>.size
+		let array: Array<Void> = Array<Void>(repeating: (), count: 2)
 		super.setup()
+		j = RingBuffer<(μ: Buffer, σ: Buffer)>(array: array.map {(
+			context.make(length: length),
+			context.make(length: length)
+			)
+		})
 	}
 	internal func collect_clear(commandBuffer: MTLCommandBuffer) {
 		refresh(commandBuffer: commandBuffer)
-		cell.distributor.shuffle(commandBuffer: commandBuffer, χ: χ, from: (μ: μ, σ: σ), count: cell.width)
+		cell.distributor.shuffle(commandBuffer: commandBuffer, χ: χ, μ: μ, σ: σ, count: cell.width)
 	}
 	internal func collect(commandBuffer: CommandBuffer, ignore: Set<Cell>) -> (χ: LaObjet, μ: LaObjet, σ: LaObjet) {
 		let distributor: Distributor = cell.distributor
@@ -33,10 +40,26 @@ extension Bias {
 		        σ: distributor.σ(make(nocopy: σ.contents(), rows: width, cols: 1))
 		)
 	}
+	internal func collect(distributor: Distributor, )
 	internal func correct_clear(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
-	
+		j.progress()
+		
 	}
 	internal func correct(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
+		let width: Int = cell.width
+		let Δ: (μ: LaObjet, σ: LaObjet) = cell.correct(ignore: ignore)
+		
+		do {
+			let jμ: LaObjet = make(nocopy: j.current.μ.contents(), rows: width, cols: width)
+			let jσ: LaObjet = make(nocopy: j.current.σ.contents(), rows: width, cols: width)
+			func block(_: CommandBuffer) {
+				matrix_product(Δ.μ, jμ).render(to: Δμ.contents())
+				matrix_product(Δ.σ, jσ).render(to: Δσ.contents())
+			}
+			let commandBuffer: CommandBuffer = context.make()
+			commandBuffer.addCompletedHandler(block)
+			commandBuffer.commit()
+		}
 		
 	}
 }

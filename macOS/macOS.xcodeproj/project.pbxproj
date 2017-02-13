@@ -59,6 +59,7 @@
 		87B8F6691E3B8C0C00A706F5 /* Bias.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87B8F6681E3B8C0C00A706F5 /* Bias.swift */; };
 		87DF0E351E49F0BB00103A8F /* Computer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 875931A61E3B6E14006B60FF /* Computer.framework */; };
 		87E979461E3EF9610074F799 /* RingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E979451E3EF9610074F799 /* RingBuffer.swift */; };
+		87EFD6771E4DFEBC00E2EBD6 /* LaObjet.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87B32ABE1E4B0D470080491F /* LaObjet.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -169,6 +170,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				87EFD6771E4DFEBC00E2EBD6 /* LaObjet.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1460,7 +1462,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.organi2e.kn.kotan.C-";
+				PRODUCT_BUNDLE_IDENTIFIER = com.organi2e.kn.kotan.C3;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -1519,7 +1521,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
 				MTL_ENABLE_DEBUG_INFO = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.organi2e.kn.kotan.C-";
+				PRODUCT_BUNDLE_IDENTIFIER = com.organi2e.kn.kotan.C3;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;

@@ -9,7 +9,6 @@
 import CoreData
 import Computer
 import Optimizer
-
 public class Arcane: ManagedObject {
 	var χ: Buffer!
 	var μ: Buffer!
@@ -23,7 +22,7 @@ public class Arcane: ManagedObject {
 extension Arcane {
 	private static let locationkey: String = "location"
 	private static let logscalekey: String = "logscale"
-	internal func update(commandBuffer: MTLCommandBuffer) {
+	internal func update(commandBuffer: CommandBuffer) {
 		func willChange(_: CommandBuffer) {
 			willChangeValue(forKey: type(of: self).locationkey)
 			willChangeValue(forKey: type(of: self).logscalekey)

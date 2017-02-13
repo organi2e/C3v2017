@@ -7,21 +7,23 @@
 //
 
 import Metal
-import LaObjet
 
 public protocol Stochastic {
-	func shuffle(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, from: (μ: MTLBuffer, σ: MTLBuffer), count: Int)
+	
+	func shuffle(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int)
+	
+	func errorState(commandBuffer: MTLCommandBuffer, Δ: MTLBuffer, ψ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int)
+	func errorValue(commandBuffer: MTLCommandBuffer, Δ: MTLBuffer, ψ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int)
+	func deltaState(commandBuffer: MTLCommandBuffer, Δμ: MTLBuffer, Δσ: MTLBuffer, Δ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int)
+	func deltaValue(commandBuffer: MTLCommandBuffer, Δμ: MTLBuffer, Δσ: MTLBuffer, Δ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int)
+	
 }
 public protocol Synthesis {
-	func μ(_: LaObjet) -> LaObjet
-	func σ(_: LaObjet) -> LaObjet
-	func synthesize(commandBuffer: MTLCommandBuffer, ϝ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer), Σ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer), count: Int)
-	/*
-	func collect(r: MTLBuffer, x: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer))
-	func collect(w: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer), x: MTLBuffer)
-	func collect(x: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer))
-	func clear()
-	*/
+	func synthesize(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer)
+	func collect(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer)
+	func collect(commandBuffer: MTLCommandBuffer, r: MTLBuffer, x: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer))
+	func collect(commandBuffer: MTLCommandBuffer, w: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer), x: MTLBuffer, count: Int)
+	func reset(commandBuffer: MTLCommandBuffer)
 }
 public protocol Distributor: Stochastic, Synthesis {
 	

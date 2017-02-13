@@ -23,61 +23,94 @@ inline float4x4 rsqrt(float4x4);
 
 constant uint3 const xorshift [[ function_constant(0) ]];
 
-kernel void GaussSynthesize16(device float4x4 * const state [[ buffer(0) ]],
-							  device float4x4 * const mu [[ buffer(1) ]],
-							  device float4x4 * const sigma [[ buffer(2) ]],
-							  device float4x4 const * const sum_value [[ buffer(3) ]],
-							  device float4x4 const * const sum_mu [[ buffer(4) ]],
-							  device float4x4 const * const sum_sigma [[ buffer(5) ]],
+kernel void GaussErrorState16(device float4x4 * const error [[ buffer(0) ]],
+							  device float4x4 const * const target [[ buffer(1) ]],
+							  device float4x4 const * const mu [[ buffer(2) ]],
+							  device float4x4 const * const sigma [[ buffer(3) ]],
 							  uint const n [[ thread_position_in_grid ]]) {
-	int const k = n;
-	
-	float4x4 const v = sum_value[k];
-	float4x4 const m = sum_mu[k];
-	float4x4 const s = sum_sigma[k];
-
-	state[k] = float4x4(step(0.0,v[0]),
-						step(0.0,v[1]),
-						step(0.0,v[2]),
-						step(0.0,v[3]));
-	mu[k] = m;
-	sigma[k] = float4x4(sqrt(s[0]),
-						sqrt(s[1]),
-						sqrt(s[2]),
-						sqrt(s[3]));
-	
-	
-	/*
-	float4x4 const mu = accum_mu[n];
-	float4x4 const sigma = accum_sigma[n];
-	float4x4 const lambda = float4x4(rsqrt(sigma[0]), rsqrt(sigma[1]), rsqrt(sigma[2]), rsqrt(sigma[3]));
-	float4x4 const level = float4x4(mu[0]*lambda[0], mu[1]*lambda[1], mu[2]*lambda[2], mu[3]*lambda[3]);
-	float4x4 const grads = standardization * float4x4(exp(-0.5*level[0]*level[0]),
-													  exp(-0.5*level[1]*level[1]),
-													  exp(-0.5*level[2]*level[2]),
-													  exp(-0.5*level[3]*level[3]));
-	
-	float4x4 const gu = float4x4(grads[0]*lambda[0],
-								 grads[1]*lambda[1],
-								 grads[2]*lambda[2],
-								 grads[3]*lambda[3]);
-	float4x4 const gs = float4x4(0);
-	state[n] = step(0.0, value[n]);
-	grads_mu[n] = gu;
-	grads_sigma[n] = gs;
-	 */
+	int const idx = n;
+	float4x4 const t = target[idx];
+	float4x4 const u = mu[idx];
+	float4x4 const s = sigma[idx];
+	float4x4 const x = M_SQRT1_2_F * float4x4(u[0]/s[0],
+											  u[1]/s[1],
+											  u[2]/s[2],
+											  u[3]/s[3]);
+	error[idx] = float4x4(t[0]-0.5-0.5*erf(x[0]),
+						  t[1]-0.5-0.5*erf(x[1]),
+						  t[2]-0.5-0.5*erf(x[2]),
+						  t[3]-0.5-0.5*erf(x[3]));
 }
-kernel void GaussSynthesize(device float * const state [[ buffer(0) ]],
-							device float * const mu [[ buffer(1) ]],
-							device float * const sigma [[ buffer(2) ]],
-							device float const * const sum_value [[ buffer(3) ]],
-							device float const * const sum_mu [[ buffer(4) ]],
-							device float const * const sum_sigma [[ buffer(5) ]],
+
+kernel void GaussErrorValue16(device float4x4 * const error [[ buffer(0) ]],
+							  device float4x4 const * const target [[ buffer(1) ]],
+							  device float4x4 const * const mu [[ buffer(2) ]],
+							  device float4x4 const * const sigma [[ buffer(3) ]],
+							  uint const n [[ thread_position_in_grid ]]) {
+	int const idx = n;
+	error[idx] = target[idx] - mu[idx];
+}
+
+constant float const M_SQRT1_2PI_F = 0.5 * M_2_SQRTPI_F * M_SQRT1_2_F;
+kernel void GaussDeltaState16(device float4x4 * const delta_mu [[ buffer(0) ]],
+							  device float4x4 * const delta_sigma [[ buffer(1) ]],
+							  device float4x4 const * const mu [[ buffer(2)  ]],
+							  device float4x4 const * const sigma [[ buffer(3) ]],
+							  device float4x4 const * const delta [[ buffer(4) ]],
+							  uint const n [[ thread_position_in_grid ]]) {
+	int const idx = n;
+	float4x4 const u = mu[idx];
+	float4x4 const s = sigma[idx];
+	float4x4 const d = delta[idx];
+	float4x4 const x = float4x4(u[0]/s[0],
+								u[1]/s[1],
+								u[2]/s[2],
+								u[3]/s[3]);
+	float4x4 const g = M_SQRT1_2PI_F * float4x4(exp(-0.5*x[0]*x[0])/s[0],
+												exp(-0.5*x[1]*x[1])/s[1],
+												exp(-0.5*x[2]*x[2])/s[2],
+												exp(-0.5*x[3]*x[3])/s[3]);
+	delta_mu[idx] = g;
+	delta_sigma[idx] = float4x4(-g[0]*x[0],
+								-g[1]*x[1],
+								-g[2]*x[2],
+								-g[3]*x[3]);
+}
+
+kernel void GaussDeltaValue16(device float4x4 * const delta_mu [[ buffer(0) ]],
+							  device float4x4 * const delta_sigma [[ buffer(1) ]],
+							  device float4x4 const * const mu [[ buffer(2)  ]],
+							  device float4x4 const * const sigma [[ buffer(3) ]],
+							  device float4x4 const * const delta [[ buffer(4) ]],
+							  uint const n [[ thread_position_in_grid ]]) {
+	int const idx = n;
+	float4x4 const s = sigma[idx];
+	float4x4 const d = delta[idx];
+	delta_mu[idx] = d;
+	delta_sigma[idx] = 2.0 * float4x4((d[0]*d[0]-s[0]*s[0])*s[0],
+									  (d[1]*d[1]-s[1]*s[1])*s[1],
+									  (d[2]*d[2]-s[2]*s[2])*s[2],
+									  (d[3]*d[3]-s[3]*s[3])*s[3]);
+}
+
+kernel void GaussSynthesize16(device float4x4 * const sigma [[ buffer(0) ]],
+							  device float4x4 const * const variance [[ buffer(1) ]],
+							  uint const n [[ thread_position_in_grid ]]) {
+	int const idx = n;
+	float4x4 const v = variance[idx];
+	sigma[idx] = float4x4(sqrt(v[0]),
+						  sqrt(v[1]),
+						  sqrt(v[2]),
+						  sqrt(v[3]));
+}
+kernel void GaussSynthesize(device float * const mu [[ buffer(0) ]],
+							device float * const sigma [[ buffer(1) ]],
+							device float const * const sum_mu [[ buffer(2) ]],
+							device float const * const sum_sigma [[ buffer(3) ]],
 							uint const n [[ thread_position_in_grid ]]) {
-	int const k = n;
-	state[k] = step(0, sum_value[k]);
-	mu[k] = sum_mu[k];
-	sigma[k] = sqrt(sum_sigma[k]);
+	int const idx = n;
+	mu[idx] = sum_mu[idx];
+	sigma[idx] = sqrt(sum_sigma[idx]);
 }
 kernel void GaussGradient(device float4x4 * const mu [[ buffer(0) ]],
 						  device float4x4 * const sigma [[ buffer(1) ]],
@@ -119,17 +152,7 @@ kernel void GaussGradient(device float4x4 * const mu [[ buffer(0) ]],
 						-g[3]*x[3]);
 	
 }
-
-kernel void GaussRNG2(device float2 * const value [[ buffer(0) ]],
-					  device const float2 * const mu [[ buffer(1) ]],
-					  device const float2 * const sigma [[ buffer(2) ]],
-					  constant const uint2 * const seeds [[ buffer(3) ]],
-					  uint const n [[ thread_position_in_grid ]],
-					  uint const N [[ threads_per_grid ]]) {
-	float2 const u = (float2(seeds[n]) + 0.5)/ 4294967296.0;
-	value[n] = sqrt(-2.0*log(u.y)) * float2(cospi(2.0*u.x), sinpi(2.0*u.x));
-}
-
+constant float M_1_UINT32MAX_F = 1 / 4294967296.0;
 kernel void GaussRNG16(device float4x4 * const value [[ buffer(0) ]],
 					   device const float4x4 * const mu [[ buffer(1) ]],
 					   device const float4x4 * const sigma [[ buffer(2) ]],
@@ -137,7 +160,6 @@ kernel void GaussRNG16(device float4x4 * const value [[ buffer(0) ]],
 					   constant const uint & length [[ buffer(4) ]],
 					   uint const n [[ thread_position_in_grid ]],
 					   uint const N [[ threads_per_grid ]]) {
-	float const s = 1 / 4294967296.0;
 	uint4 seq = seeds[n];
 	seq = select ( seq, ~0, seq == 0 );
 	
@@ -150,7 +172,7 @@ kernel void GaussRNG16(device float4x4 * const value [[ buffer(0) ]],
 		seq ^= seq << xorshift.x, seq ^= seq >> xorshift.y, seq ^= seq << xorshift.z; u[2] = float4(seq) - 0.5;
 		seq ^= seq << xorshift.x, seq ^= seq >> xorshift.y, seq ^= seq << xorshift.z; u[3] = float4(seq) - 0.5;
 		
-		value[k] = BoxMuller(mu[k], sigma[k], s*u);
+		value[k] = BoxMuller(mu[k], sigma[k], M_1_UINT32MAX_F*u);
 		
 	}
 }
@@ -220,21 +242,20 @@ inline float4 shuffle(float4x4 const w[4], float4x4 const x) {
 			x[2]*float4x4(w[0][2], w[1][2], w[2][2], w[3][2])+
 			x[3]*float4x4(w[0][3], w[1][3], w[2][3], w[3][3]);
 }
-kernel void GaussCollectA(device float4x4 * const y_value [[ buffer(0) ]],
-						  device float4x4 * const y_mu [[ buffer(1) ]],
-						  device float4x4 * const y_sigma [[ buffer(2) ]],
-						  device float4x4 const * const w_value [[ buffer(3) ]],
-						  device float4x4 const * const w_mu [[ buffer(4) ]],
-						  device float4x4 const * const w_sigma [[ buffer(5) ]],
-						  device float4x4 const * const x [[ buffer(6) ]],
-						  constant uint const & length [[ buffer(7) ]],
-						  threadgroup float4x4 * accumulator_value [[ threadgroup(0) ]],
-						  threadgroup float4x4 * accumulator_mu [[ threadgroup(1) ]],
-						  threadgroup float4x4 * accumulator_sigma [[ threadgroup(2) ]],
-						  uint const t [[ thread_position_in_threadgroup ]],
-						  uint const T [[ threads_per_threadgroup ]],
-						  uint const m [[ threadgroup_position_in_grid ]]) {
-	
+kernel void GaussCollectW16(device float4x4 * const y_value [[ buffer(0) ]],
+							device float4x4 * const y_mean [[ buffer(1) ]],
+							device float4x4 * const y_variance [[ buffer(2) ]],
+							device float4x4 const * const w_value [[ buffer(3) ]],
+							device float4x4 const * const w_mu [[ buffer(4) ]],
+							device float4x4 const * const w_sigma [[ buffer(5) ]],
+							device float4x4 const * const x [[ buffer(6) ]],
+							constant uint const & length [[ buffer(7) ]],
+							threadgroup float4x4 * accumulator_value [[ threadgroup(0) ]],
+							threadgroup float4x4 * accumulator_mean [[ threadgroup(1) ]],
+							threadgroup float4x4 * accumulator_variance [[ threadgroup(2) ]],
+							uint const t [[ thread_position_in_threadgroup ]],
+							uint const T [[ threads_per_threadgroup ]],
+							uint const m [[ threadgroup_position_in_grid ]]) {
 	int4 const ref[4] = {
 		( 16 * m + 0x0 + int4(0, 1, 2, 3)) * length,
 		( 16 * m + 0x4 + int4(0, 1, 2, 3)) * length,
@@ -243,8 +264,8 @@ kernel void GaussCollectA(device float4x4 * const y_value [[ buffer(0) ]],
 	};
 	
 	float4x4 value = float4x4(0);
-	float4x4 mu = float4x4(0);
-	float4x4 sigma = float4x4(0);
+	float4x4 mean = float4x4(0);
+	float4x4 variance = float4x4(0);
 	
 	//split each element because several gpu architecture has few register
 	for ( int k = t, K = length ; k < K ; k += T ) {
@@ -256,8 +277,8 @@ kernel void GaussCollectA(device float4x4 * const y_value [[ buffer(0) ]],
 				value[0] += shuffle(weight_value, f);
 			}
 			{
-				float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
-				mu[0] += shuffle(weight_mu, f);
+				float4x4 const weight_mean[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
+				mean[0] += shuffle(weight_mean, f);
 			}
 		}
 		{
@@ -267,8 +288,8 @@ kernel void GaussCollectA(device float4x4 * const y_value [[ buffer(0) ]],
 				value[1] += shuffle(weight_value, f);
 			}
 			{
-				float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
-				mu[1] += shuffle(weight_mu, f);
+				float4x4 const weight_mean[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
+				mean[1] += shuffle(weight_mean, f);
 			}
 		}
 		{
@@ -278,8 +299,8 @@ kernel void GaussCollectA(device float4x4 * const y_value [[ buffer(0) ]],
 				value[2] += shuffle(weight_value, f);
 			}
 			{
-				float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
-				mu[2] += shuffle(weight_mu, f);
+				float4x4 const weight_mean[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
+				mean[2] += shuffle(weight_mean, f);
 			}
 		}
 		{
@@ -289,8 +310,8 @@ kernel void GaussCollectA(device float4x4 * const y_value [[ buffer(0) ]],
 				value[3] += shuffle(weight_value, f);
 			}
 			{
-				float4x4 const weight_mu[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
-				mu[3] += shuffle(weight_mu, f);
+				float4x4 const weight_mean[4] = {w_mu[idx.x], w_mu[idx.y], w_mu[idx.z], w_mu[idx.w]};
+				mean[3] += shuffle(weight_mean, f);
 			}
 		}
 	}
@@ -298,23 +319,23 @@ kernel void GaussCollectA(device float4x4 * const y_value [[ buffer(0) ]],
 		float4x4 const f2 = sq(x[k]);
 		{
 			int4 const idx = k + ref[0];
-			float4x4 const weight_sigma[4] = {sq(w_sigma[idx.x]), sq(w_sigma[idx.y]), sq(w_sigma[idx.z]), sq(w_sigma[idx.w])};
-			sigma[0] += shuffle(weight_sigma, f2);
+			float4x4 const weight_variance[4] = {sq(w_sigma[idx.x]), sq(w_sigma[idx.y]), sq(w_sigma[idx.z]), sq(w_sigma[idx.w])};
+			variance[0] += shuffle(weight_variance, f2);
 		}
 		{
 			int4 const idx = k + ref[1];
-			float4x4 const weight_sigma[4] = {sq(w_sigma[idx.x]), sq(w_sigma[idx.y]), sq(w_sigma[idx.z]), sq(w_sigma[idx.w])};
-			sigma[1] += shuffle(weight_sigma, f2);
+			float4x4 const weight_variance[4] = {sq(w_sigma[idx.x]), sq(w_sigma[idx.y]), sq(w_sigma[idx.z]), sq(w_sigma[idx.w])};
+			variance[1] += shuffle(weight_variance, f2);
 		}
 		{
 			int4 const idx = k + ref[2];
-			float4x4 const weight_sigma[4] = {sq(w_sigma[idx.x]), sq(w_sigma[idx.y]), sq(w_sigma[idx.z]), sq(w_sigma[idx.w])};
-			sigma[2] += shuffle(weight_sigma, f2);
+			float4x4 const weight_variance[4] = {sq(w_sigma[idx.x]), sq(w_sigma[idx.y]), sq(w_sigma[idx.z]), sq(w_sigma[idx.w])};
+			variance[2] += shuffle(weight_variance, f2);
 		}
 		{
 			int4 const idx = k + ref[3];
-			float4x4 const weight_sigma[4] = {sq(w_sigma[idx.x]), sq(w_sigma[idx.y]), sq(w_sigma[idx.z]), sq(w_sigma[idx.w])};
-			sigma[3] += shuffle(weight_sigma, f2);
+			float4x4 const weight_variance[4] = {sq(w_sigma[idx.x]), sq(w_sigma[idx.y]), sq(w_sigma[idx.z]), sq(w_sigma[idx.w])};
+			variance[3] += shuffle(weight_variance, f2);
 		}
 	}
 	
@@ -322,67 +343,66 @@ kernel void GaussCollectA(device float4x4 * const y_value [[ buffer(0) ]],
 	int b = T;
 	
 	accumulator_value[a] = value;
-	accumulator_mu[a] = mu;
-	accumulator_sigma[a] = sigma;
+	accumulator_mean[a] = mean;
+	accumulator_variance[a] = variance;
 	
 	while ( b >>= 1 ) {
 		threadgroup_barrier(mem_flags::mem_threadgroup);
 		if ( a < b ) {
 			accumulator_value[a] += accumulator_value[a+b];
-			accumulator_mu[a] += accumulator_mu[a+b];
-			accumulator_sigma[a] += accumulator_sigma[a+b];
+			accumulator_mean[a] += accumulator_mean[a+b];
+			accumulator_variance[a] += accumulator_variance[a+b];
 		}
 	}
 	if ( !a ) {
 		int const idx = m;
 		y_value[idx] += accumulator_value[a];
-		y_mu[idx] += accumulator_mu[a];
-		y_sigma[idx] += accumulator_sigma[a];
+		y_mean[idx] += accumulator_mean[a];
+		y_variance[idx] += accumulator_variance[a];
 	}
 	
 }
-kernel void GaussCollectC(device float4x4 * const y_value [[ buffer(0) ]],
-						  device float4x4 * const y_mu [[ buffer(1) ]],
-						  device float4x4 * const y_sigma [[ buffer(2) ]],
-						  device float4x4 const * const x_value [[ buffer(3) ]],
-						  device float4x4 const * const x_mu [[ buffer(4) ]],
-						  device float4x4 const * const x_sigma [[ buffer(5) ]],
-						  uint const n [[ thread_position_in_grid ]]) {
+kernel void GaussCollectC16(device float4x4 * const y_value [[ buffer(0) ]],
+							device float4x4 * const y_mean [[ buffer(1) ]],
+							device float4x4 * const y_variance [[ buffer(2) ]],
+							device float4x4 const * const x_value [[ buffer(3) ]],
+							device float4x4 const * const x_mu [[ buffer(4) ]],
+							device float4x4 const * const x_sigma [[ buffer(5) ]],
+							uint const n [[ thread_position_in_grid ]]) {
 	int const idx = n;
 	float4x4 const s = x_sigma[idx];
-	y_sigma[idx] += float4x4(s[0]*s[0],
-							 s[1]*s[1],
-							 s[2]*s[2],
-							 s[3]*s[3]);
-	y_mu[idx] += x_mu[idx];
+	y_variance[idx] += float4x4(s[0]*s[0],
+								s[1]*s[1],
+								s[2]*s[2],
+								s[3]*s[3]);
+	y_mean[idx] += x_mu[idx];
 	y_value[idx] += x_value[idx];
 }
-kernel void GaussCollectD(device float4x4 * const y_value [[ buffer(0) ]],
-						  device float4x4 * const y_mu [[ buffer(1) ]],
-						  device float4x4 * const y_sigma [[ buffer(2) ]],
-						  device float4x4 const * const weight [[ buffer(3) ]],
-						  device float4x4 const * const x_value [[ buffer(4) ]],
-						  device float4x4 const * const x_mu [[ buffer(5) ]],
-						  device float4x4 const * const x_sigma [[ buffer(6) ]],
-						  constant uint const & length [[ buffer(7) ]],
-						  uint const n [[ thread_position_in_grid ]]) {
+kernel void GaussCollectD16(device float4x4 * const y_value [[ buffer(0) ]],
+							device float4x4 * const y_mean [[ buffer(1) ]],
+							device float4x4 * const y_variance [[ buffer(2) ]],
+							device float4x4 const * const decay [[ buffer(3) ]],
+							device float4x4 const * const x_value [[ buffer(4) ]],
+							device float4x4 const * const x_mu [[ buffer(5) ]],
+							device float4x4 const * const x_sigma [[ buffer(6) ]],
+							uint const n [[ thread_position_in_grid ]]) {
 	int const k = n;
-	float4x4 const w = weight[k];
+	float4x4 const d = decay[k];
 	float4x4 const v = x_value[k];
 	float4x4 const m = x_mu[k];
 	float4x4 const s = x_sigma[k];
-	y_value[k] += float4x4(w[0]*v[0],
-						   w[1]*v[1],
-						   w[2]*v[2],
-						   w[3]*v[3]);
-	y_mu[k] += float4x4(w[0]*m[0],
-						w[1]*m[1],
-						w[2]*m[2],
-						w[3]*m[3]);
-	y_sigma[k] += float4x4(s[0]*s[0]*w[0]*w[0],
-						   s[1]*s[1]*w[1]*w[1],
-						   s[2]*s[2]*w[2]*w[2],
-						   s[3]*s[3]*w[3]*w[3]);
+	y_value[k] += float4x4(d[0]*v[0],
+						   d[1]*v[1],
+						   d[2]*v[2],
+						   d[3]*v[3]);
+	y_mean[k] += float4x4(d[0]*m[0],
+						  d[1]*m[1],
+						  d[2]*m[2],
+						  d[3]*m[3]);
+	y_variance[k] += float4x4(d[0]*d[0]*s[0]*s[0],
+							  d[1]*d[1]*s[1]*s[1],
+							  d[2]*d[2]*s[2]*s[2],
+							  d[3]*d[3]*s[3]*s[3]);
 }
 /*
 kernel void GaussGradient(device float2x4 * const g [[ buffer(0) ]],

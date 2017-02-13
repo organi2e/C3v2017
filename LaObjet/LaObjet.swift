@@ -14,43 +14,46 @@ private let attr: la_attribute_t = la_attribute_t(LA_ATTRIBUTE_ENABLE_LOGGING)
 private let hint: la_hint_t = la_hint_t(LA_NO_HINT)
 
 extension LaObjet {
-	public var status: Int {
+	final public var status: Int {
 		return la_status(self)
 	}
-	public var T: LaObjet {
+	final public var T: LaObjet {
 		return la_transpose(self)
 	}
-	public var count: UInt {
+	final public var count: UInt {
 		return la_vector_length(self)
 	}
-	public var rows: UInt {
+	final public var rows: UInt {
 		return la_matrix_rows(self)
 	}
-	public var cols: UInt {
+	final public var cols: UInt {
 		return la_matrix_cols(self)
 	}
-	public var L1: Float {
+	final public var L1: Float {
 		return la_norm_as_float(self, la_norm_t(LA_L1_NORM))
 	}
-	public var L2: Float {
+	final public var L2: Float {
 		return la_norm_as_float(self, la_norm_t(LA_L2_NORM))
 	}
-	public var LINF: Float {
+	final public var LINF: Float {
 		return la_norm_as_float(self, la_norm_t(LA_LINF_NORM))
 	}
-	public subscript(index: Int) -> LaObjet {
+	final public subscript(index: Int) -> LaObjet {
 		return la_splat_from_vector_element(self, la_index_t(index))
 	}
-	public subscript(rows: Int, cols: Int) -> LaObjet {
+	final public subscript(rows: Int, cols: Int) -> LaObjet {
 		return la_splat_from_matrix_element(self, la_index_t(rows), la_index_t(cols))
 	}
-	public subscript(range: Range<Int>) -> LaObjet {
+	final public subscript(range: Range<Int>) -> LaObjet {
 		return la_vector_slice(self, range.lowerBound, 1, la_count_t(range.count))
 	}
-	public subscript(rows: Range<Int>, cols: Range<Int>) -> LaObjet {
+	final public subscript(rows: Range<Int>, cols: Range<Int>) -> LaObjet {
 		return la_matrix_slice(self, rows.lowerBound, cols.lowerBound, 1, 1, la_count_t(rows.count), la_count_t(cols.count))
 	}
-	public func render(to: UnsafeRawPointer, stride: Int? = nil) {
+	final public func fill(rows: Int, cols: Int) -> LaObjet {
+		return la_matrix_from_splat(self, la_count_t(rows), la_count_t(cols))
+	}
+	final public func render(to: UnsafeRawPointer, stride: Int? = nil) {
 		la_matrix_to_float_buffer(UnsafeMutablePointer<Float>(OpaquePointer(to)), la_count_t(stride ?? Int(la_matrix_cols(self))), self)
 	}
 }
@@ -105,6 +108,12 @@ public func matrix_solve(_ lhs: LaObjet, _ rhs: LaObjet) -> LaObjet {
 	return la_solve(lhs, rhs)
 }
 
+public func make(eye: Int) -> LaObjet {
+	return la_identity_matrix(la_count_t(eye), la_scalar_type_t(LA_SCALAR_TYPE_FLOAT), attr)
+}
+public func make(eye: LaObjet) -> LaObjet {
+	return la_diagonal_matrix_from_vector(eye, 0)
+}
 public func make(value: Float) -> LaObjet {
 	return la_splat_from_float(value, attr)
 }

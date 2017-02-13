@@ -14,7 +14,7 @@ import Optimizer
 
 public class Context: NSManagedObjectContext {
 	let computer: Computer
-	let gauss: Distributor
+	let gaussFactory: (Int) -> Distributor
 	let optimizerFactory: (Int) -> Optimizer
 	enum ErrorCases: Error, CustomStringConvertible {
 		case InvalidContext
@@ -37,7 +37,7 @@ public class Context: NSManagedObjectContext {
 	public init(storage: URL? = nil, device: MTLDevice? = nil, concurrencyType: NSManagedObjectContextConcurrencyType = .privateQueueConcurrencyType) throws {
 		guard let device: MTLDevice = device ?? MTLCreateSystemDefaultDevice() else { throw ErrorCases.NoDeviceFound }
 		computer = try Computer(device: device)
-		gauss = try Gauss.factory()(device)
+		gaussFactory = try Gauss.factory()(device)
 		optimizerFactory = try Adam.factory()(device)
 		super.init(concurrencyType: concurrencyType)
 		guard let model: NSManagedObjectModel = NSManagedObjectModel.mergedModel(from: [Bundle(for: type(of: self))]) else { throw ErrorCases.NoModelFound }
@@ -49,7 +49,7 @@ public class Context: NSManagedObjectContext {
 	public required init?(coder aDecoder: NSCoder) {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { fatalError(ErrorCases.NoDeviceFound.description) }
 		computer = try!Computer(device: device)
-		gauss = try!Gauss.factory()(device)
+		gaussFactory = try!Gauss.factory()(device)
 		optimizerFactory = try!Adam.factory()(device)
 		super.init(coder: aDecoder)
 	}
