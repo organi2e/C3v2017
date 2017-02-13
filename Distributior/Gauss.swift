@@ -7,10 +7,7 @@
 //
 
 import Accelerate
-import simd
-
 import Metal
-import LaObjet
 
 public class Gauss {
 	let value: MTLBuffer
@@ -90,94 +87,86 @@ extension Gauss: Stochastic {
 		assert( count * MemoryLayout<Float>.size <= μ.length && μ.device === rng16.device )
 		assert( count * MemoryLayout<Float>.size <= σ.length && σ.device === rng16.device )
 		
-		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		let seeds: Array<UInt8> = Array<UInt8>(repeating: 0, count: 4096)
-		arc4random_buf(UnsafeMutablePointer<UInt8>(mutating: seeds), seeds.count)
-		encoder.setComputePipelineState(rng16)
-		encoder.setBuffer(χ, offset: 0, at: 0)
-		encoder.setBuffer(μ, offset: 0, at: 1)
-		encoder.setBuffer(σ, offset: 0, at: 2)
-		encoder.setBytes(seeds, length: seeds.count, at: 3)
-		encoder.setBytes([uint(count-1)/16+1], length: MemoryLayout<uint>.size, at: 4)
-		encoder.dispatchThreadgroups(MTLSize(width: 4, height: 1, depth: 1),
-		                             threadsPerThreadgroup: MTLSize(width: 64, height: 1, depth: 1))
-		encoder.endEncoding()
+		do {
+			let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+			let seeds: Array<UInt8> = Array<UInt8>(repeating: 0, count: 4096)
+			arc4random_buf(UnsafeMutablePointer<UInt8>(mutating: seeds), seeds.count)
+			encoder.setComputePipelineState(rng16)
+			encoder.setBuffers([χ, μ, σ], offsets: [0, 0, 0], with: NSRange(0..<3))
+			encoder.setBytes(seeds, length: seeds.count, at: 3)
+			encoder.setBytes([uint(count-1)/16+1], length: MemoryLayout<uint>.size, at: 4)
+			encoder.dispatchThreadgroups(MTLSize(width: 4, height: 1, depth: 1),
+			                             threadsPerThreadgroup: MTLSize(width: 64, height: 1, depth: 1))
+			encoder.endEncoding()
+		}
 	}
-	public func errorValue(commandBuffer: MTLCommandBuffer, Δ: MTLBuffer, ψ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int) {
+	public func errorValue(commandBuffer: MTLCommandBuffer, Δ: MTLBuffer, ψ: MTLBuffer) {
 		
-		assert( count * MemoryLayout<Float>.size <= Δ.length && Δ.device === errorValue16.device )
-		assert( count * MemoryLayout<Float>.size <= ψ.length && ψ.device === errorValue16.device )
-		assert( count * MemoryLayout<Float>.size <= μ.length && μ.device === errorValue16.device )
-		assert( count * MemoryLayout<Float>.size <= σ.length && σ.device === errorValue16.device )
+		assert( width * MemoryLayout<Float>.size <= Δ.length && Δ.device === errorValue16.device )
+		assert( width * MemoryLayout<Float>.size <= ψ.length && ψ.device === errorValue16.device )
 		
-		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		encoder.setComputePipelineState(errorValue16)
-		encoder.setBuffer(Δ, offset: 0, at: 0)
-		encoder.setBuffer(ψ, offset: 0, at: 1)
-		encoder.setBuffer(μ, offset: 0, at: 2)
-		encoder.setBuffer(σ, offset: 0, at: 3)
-		encoder.dispatchThreadgroups(MTLSize(width: (count-1)/16+1, height: 1, depth: 1),
-		                             threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
-		encoder.endEncoding()
+		do {
+			let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+			encoder.setComputePipelineState(errorValue16)
+			encoder.setBuffers([Δ, ψ, mean, variance], offsets: [0, 0, 0, 0], with: NSRange(0..<4))
+			encoder.dispatchThreadgroups(MTLSize(width: (width-1)/16+1, height: 1, depth: 1),
+			                             threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+			encoder.endEncoding()
+		}
 	}
-	public func errorState(commandBuffer: MTLCommandBuffer, Δ: MTLBuffer, ψ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int) {
+	public func errorState(commandBuffer: MTLCommandBuffer, Δ: MTLBuffer, ψ: MTLBuffer) {
 		
-		assert( count * MemoryLayout<Float>.size <= Δ.length && Δ.device === errorState16.device )
-		assert( count * MemoryLayout<Float>.size <= ψ.length && ψ.device === errorState16.device )
-		assert( count * MemoryLayout<Float>.size <= μ.length && μ.device === errorState16.device )
-		assert( count * MemoryLayout<Float>.size <= σ.length && σ.device === errorState16.device )
+		assert( width * MemoryLayout<Float>.size <= Δ.length && Δ.device === errorState16.device )
+		assert( width * MemoryLayout<Float>.size <= ψ.length && ψ.device === errorState16.device )
 		
-		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		encoder.setComputePipelineState(errorState16)
-		encoder.setBuffer(Δ, offset: 0, at: 0)
-		encoder.setBuffer(ψ, offset: 0, at: 1)
-		encoder.setBuffer(μ, offset: 0, at: 2)
-		encoder.setBuffer(σ, offset: 0, at: 3)
-		encoder.dispatchThreadgroups(MTLSize(width: (count-1)/16+1, height: 1, depth: 1),
-		                             threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
-		encoder.endEncoding()
+		do {
+			let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+			encoder.setComputePipelineState(errorState16)
+			encoder.setBuffers([Δ, ψ, mean, variance], offsets: [0, 0, 0, 0], with: NSRange(0..<4))
+			encoder.dispatchThreadgroups(MTLSize(width: (width-1)/16+1, height: 1, depth: 1),
+			                             threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+			encoder.endEncoding()
+		}
 	}
-	public func deltaValue(commandBuffer: MTLCommandBuffer, Δμ: MTLBuffer, Δσ: MTLBuffer, Δ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int) {
+	public func deltaValue(commandBuffer: MTLCommandBuffer, Δμ: MTLBuffer, Δσ: MTLBuffer, Δ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) {
 		
-		assert( count * MemoryLayout<Float>.size <= Δμ.length && Δμ.device === deltaValue16.device )
-		assert( count * MemoryLayout<Float>.size <= Δσ.length && Δσ.device === deltaValue16.device )
-		assert( count * MemoryLayout<Float>.size <= Δ.length && Δ.device === deltaValue16.device )
-		assert( count * MemoryLayout<Float>.size <= μ.length && μ.device === deltaValue16.device )
-		assert( count * MemoryLayout<Float>.size <= σ.length && σ.device === deltaValue16.device )
+		assert( width * MemoryLayout<Float>.size <= Δμ.length && Δμ.device === deltaValue16.device )
+		assert( width * MemoryLayout<Float>.size <= Δσ.length && Δσ.device === deltaValue16.device )
+		assert( width * MemoryLayout<Float>.size <= Δ.length && Δ.device === deltaValue16.device )
+		assert( width * MemoryLayout<Float>.size <= μ.length && μ.device === deltaValue16.device )
+		assert( width * MemoryLayout<Float>.size <= σ.length && σ.device === deltaValue16.device )
 		
-		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		encoder.setComputePipelineState(deltaValue16)
-		encoder.setBuffer(Δμ, offset: 0, at: 0)
-		encoder.setBuffer(Δσ, offset: 0, at: 1)
-		encoder.setBuffer(Δ, offset: 0, at: 2)
-		encoder.setBuffer(μ, offset: 0, at: 3)
-		encoder.setBuffer(σ, offset: 0, at: 4)
-		encoder.dispatchThreadgroups(MTLSize(width: (count-1)/16+1, height: 1, depth: 1),
-		                             threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
-		encoder.endEncoding()
+		do {
+			let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+			encoder.setComputePipelineState(deltaValue16)
+			encoder.setBuffers([Δμ, Δσ, Δ, μ, σ], offsets: [0, 0, 0, 0, 0], with: NSRange(0..<5))
+			encoder.dispatchThreadgroups(MTLSize(width: (width-1)/16+1, height: 1, depth: 1),
+			                             threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+			encoder.endEncoding()
+		}
 	}
-	public func deltaState(commandBuffer: MTLCommandBuffer, Δμ: MTLBuffer, Δσ: MTLBuffer, Δ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int) {
+	public func deltaState(commandBuffer: MTLCommandBuffer, Δμ: MTLBuffer, Δσ: MTLBuffer, Δ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) {
 		
-		assert( count * MemoryLayout<Float>.size <= Δμ.length && Δμ.device === deltaValue16.device )
-		assert( count * MemoryLayout<Float>.size <= Δσ.length && Δσ.device === deltaValue16.device )
-		assert( count * MemoryLayout<Float>.size <= Δ.length && Δ.device === deltaValue16.device )
-		assert( count * MemoryLayout<Float>.size <= μ.length && μ.device === deltaValue16.device )
-		assert( count * MemoryLayout<Float>.size <= σ.length && σ.device === deltaValue16.device )
+		assert( width * MemoryLayout<Float>.size <= Δμ.length && Δμ.device === deltaValue16.device )
+		assert( width * MemoryLayout<Float>.size <= Δσ.length && Δσ.device === deltaValue16.device )
+		assert( width * MemoryLayout<Float>.size <= Δ.length && Δ.device === deltaValue16.device )
+		assert( width * MemoryLayout<Float>.size <= μ.length && μ.device === deltaValue16.device )
+		assert( width * MemoryLayout<Float>.size <= σ.length && σ.device === deltaValue16.device )
 		
-		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		encoder.setComputePipelineState(deltaState16)
-		encoder.setBuffer(Δμ, offset: 0, at: 0)
-		encoder.setBuffer(Δσ, offset: 0, at: 1)
-		encoder.setBuffer(Δ, offset: 0, at: 2)
-		encoder.setBuffer(μ, offset: 0, at: 3)
-		encoder.setBuffer(σ, offset: 0, at: 4)
-		encoder.dispatchThreadgroups(MTLSize(width: (count-1)/16+1, height: 1, depth: 1),
-		                             threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
-		encoder.endEncoding()
+		do {
+			let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+			encoder.setComputePipelineState(deltaState16)
+			encoder.setBuffers([Δμ, Δσ, Δ, μ, σ], offsets: [0, 0, 0, 0, 0], with: NSRange(0..<5))
+			encoder.dispatchThreadgroups(MTLSize(width: (width-1)/16+1, height: 1, depth: 1),
+			                             threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+			encoder.endEncoding()
+		}
 	}
 }
 extension Gauss: Synthesis {
 	public func synthesize(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) {
+		
+		assert( commandBuffer.device === synthesize16.device )
 		
 		assert( width * MemoryLayout<Float>.size <= χ.length && synthesize16.device === χ.device )
 		assert( width * MemoryLayout<Float>.size <= μ.length && synthesize16.device === μ.device )
@@ -198,28 +187,33 @@ extension Gauss: Synthesis {
 			encoder.endEncoding()
 		}
 	}
-	public func collect(commandBuffer: MTLCommandBuffer, w: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer), x: MTLBuffer, count: Int) {
+	public func collect(commandBuffer: MTLCommandBuffer, w: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer), x: MTLBuffer, refer: Int) {
 		
-		assert( width * count * MemoryLayout<Float>.size <= w.χ.length && collectW16.device === w.χ.device )
-		assert( width * count * MemoryLayout<Float>.size <= w.μ.length && collectW16.device === w.μ.device )
-		assert( width * count * MemoryLayout<Float>.size <= w.σ.length && collectW16.device === w.σ.device )
+		assert( commandBuffer.device === collectW16.device )
 		
-		assert( count * MemoryLayout<Float>.size <= x.length && collectW16.device === x.device )
+		assert( width * refer * MemoryLayout<Float>.size <= w.χ.length && collectW16.device === w.χ.device )
+		assert( width * refer * MemoryLayout<Float>.size <= w.μ.length && collectW16.device === w.μ.device )
+		assert( width * refer * MemoryLayout<Float>.size <= w.σ.length && collectW16.device === w.σ.device )
+		
+		assert( refer * MemoryLayout<Float>.size <= x.length && collectW16.device === x.device )
 		
 		do {
 			let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+			let length: Int = MemoryLayout<Float>.size * 16 * 64
 			encoder.setComputePipelineState(collectW16)
 			encoder.setBuffers([value, mean, variance, w.χ, w.μ, w.σ, x], offsets: [0, 0, 0, 0, 0, 0, 0], with: NSRange(0..<7))
-			encoder.setBytes([uint(count-1)/16+1], length: MemoryLayout<uint>.size, at: 7)
-			encoder.setThreadgroupMemoryLength(MemoryLayout<Float>.size*16*64, at: 0)
-			encoder.setThreadgroupMemoryLength(MemoryLayout<Float>.size*16*64, at: 1)
-			encoder.setThreadgroupMemoryLength(MemoryLayout<Float>.size*16*64, at: 2)
+			encoder.setBytes([uint(refer-1)/16+1], length: MemoryLayout<uint>.size, at: 7)
+			encoder.setThreadgroupMemoryLength(length, at: 0)
+			encoder.setThreadgroupMemoryLength(length, at: 1)
+			encoder.setThreadgroupMemoryLength(length, at: 2)
 			encoder.dispatchThreadgroups(MTLSize(width: (width-1)/16+1, height: 1, depth: 1),
 			                             threadsPerThreadgroup: MTLSize(width: 64, height: 1, depth: 1))
 			encoder.endEncoding()
 		}
 	}
 	public func collect(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) {
+		
+		assert( commandBuffer.device === collectC16.device )
 		
 		assert( width * MemoryLayout<Float>.size <= χ.length && collectC16.device === χ.device )
 		assert( width * MemoryLayout<Float>.size <= μ.length && collectC16.device === μ.device )
@@ -236,11 +230,13 @@ extension Gauss: Synthesis {
 	}
 	public func collect(commandBuffer: MTLCommandBuffer, r: MTLBuffer, x: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer)) {
 		
+		assert( commandBuffer.device === collectD16.device )
+		
 		assert( width * MemoryLayout<Float>.size <= r.length && collectD16.device === r.device )
 		
-		assert( width * MemoryLayout<Float>.size <= x.χ.length && collectC16.device === x.χ.device )
-		assert( width * MemoryLayout<Float>.size <= x.μ.length && collectC16.device === x.μ.device )
-		assert( width * MemoryLayout<Float>.size <= x.σ.length && collectC16.device === x.σ.device )
+		assert( width * MemoryLayout<Float>.size <= x.χ.length && collectD16.device === x.χ.device )
+		assert( width * MemoryLayout<Float>.size <= x.μ.length && collectD16.device === x.μ.device )
+		assert( width * MemoryLayout<Float>.size <= x.σ.length && collectD16.device === x.σ.device )
 		
 		do {
 			let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
@@ -252,6 +248,11 @@ extension Gauss: Synthesis {
 		}
 	}
 	public func reset(commandBuffer: MTLCommandBuffer) {
+		
+		assert( commandBuffer.device === value.device )
+		assert( commandBuffer.device === mean.device )
+		assert( commandBuffer.device === variance.device )
+		
 		do {
 			let encoder: MTLBlitCommandEncoder = commandBuffer.makeBlitCommandEncoder()
 			encoder.fill(buffer: value, range: NSRange(0..<value.length), value: 0)

@@ -26,16 +26,16 @@ constant uint3 const xorshift [[ function_constant(0) ]];
 kernel void GaussErrorState16(device float4x4 * const error [[ buffer(0) ]],
 							  device float4x4 const * const target [[ buffer(1) ]],
 							  device float4x4 const * const mu [[ buffer(2) ]],
-							  device float4x4 const * const sigma [[ buffer(3) ]],
+							  device float4x4 const * const variance [[ buffer(3) ]],
 							  uint const n [[ thread_position_in_grid ]]) {
 	int const idx = n;
 	float4x4 const t = target[idx];
 	float4x4 const u = mu[idx];
-	float4x4 const s = sigma[idx];
-	float4x4 const x = M_SQRT1_2_F * float4x4(u[0]/s[0],
-											  u[1]/s[1],
-											  u[2]/s[2],
-											  u[3]/s[3]);
+	float4x4 const v = variance[idx];
+	float4x4 const x = M_SQRT1_2_F * float4x4(u[0]*rsqrt(v[0]),
+											  u[1]*rsqrt(v[1]),
+											  u[2]*rsqrt(v[2]),
+											  u[3]*rsqrt(v[3]));
 	error[idx] = float4x4(t[0]-0.5-0.5*erf(x[0]),
 						  t[1]-0.5-0.5*erf(x[1]),
 						  t[2]-0.5-0.5*erf(x[2]),
@@ -45,7 +45,7 @@ kernel void GaussErrorState16(device float4x4 * const error [[ buffer(0) ]],
 kernel void GaussErrorValue16(device float4x4 * const error [[ buffer(0) ]],
 							  device float4x4 const * const target [[ buffer(1) ]],
 							  device float4x4 const * const mu [[ buffer(2) ]],
-							  device float4x4 const * const sigma [[ buffer(3) ]],
+							  device float4x4 const * const variance [[ buffer(3) ]],
 							  uint const n [[ thread_position_in_grid ]]) {
 	int const idx = n;
 	error[idx] = target[idx] - mu[idx];
@@ -241,6 +241,12 @@ inline float4 shuffle(float4x4 const w[4], float4x4 const x) {
 			x[1]*float4x4(w[0][1], w[1][1], w[2][1], w[3][1])+
 			x[2]*float4x4(w[0][2], w[1][2], w[2][2], w[3][2])+
 			x[3]*float4x4(w[0][3], w[1][3], w[2][3], w[3][3]);
+}
+inline float4 sqshuffle(float4x4 const w[4], float4x4 const x) {
+	return	x[0]*x[0]*float4x4(w[0][0]*w[0][0], w[1][0]*w[1][0], w[2][0]*w[2][0], w[3][0]*w[3][0])+
+			x[1]*x[1]*float4x4(w[0][1]*w[0][1], w[1][1]*w[1][1], w[2][1]*w[2][1], w[3][1]*w[3][1])+
+			x[2]*x[2]*float4x4(w[0][2]*w[0][2], w[1][2]*w[1][2], w[2][2]*w[2][2], w[3][2]*w[3][2])+
+			x[3]*x[3]*float4x4(w[0][3]*w[0][3], w[1][3]*w[1][3], w[2][3]*w[2][3], w[3][3]*w[3][3]);
 }
 kernel void GaussCollectW16(device float4x4 * const y_value [[ buffer(0) ]],
 							device float4x4 * const y_mean [[ buffer(1) ]],

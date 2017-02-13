@@ -7,10 +7,8 @@
 //
 
 import Accelerate
+import Distributor
 import XCTest
-import Computer
-import simd
-@testable import Distributor
 
 let hint: la_hint_t = la_hint_t(LA_NO_HINT)
 let attr: la_attribute_t = la_attribute_t(LA_ATTRIBUTE_ENABLE_LOGGING)
@@ -68,6 +66,65 @@ class DistributorTests: XCTestCase {
 			XCTFail(String(describing: error))
 		}
 	}
+
+	func testGaussError() {
+		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
+		do {
+			let count: Int = 1024
+			let distributor: Distributor = try Gauss.factory()(device)(count)
+			
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			
+			let ΔS: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
+			let ΔX: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
+			
+			let ψs: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
+			let ψx: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
+			let Δs: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
+			let Δx: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
+			let χ: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
+			let μ: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
+			let σ: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
+			
+			[ψs, ψx, Δs, Δx, μ, σ].forEach {
+				let count: Int = $0.length / MemoryLayout<Float>.size
+				arc4random_buf($0.ref, $0.length)
+				vDSP_vfltu32(UnsafePointer< UInt32>(OpaquePointer($0.ref)), 1, $0.ref, 1, vDSP_Length(count))
+				vDSP_vsmul($0.ref, 1, [1.0/Float(65536)], $0.ref, 1, vDSP_Length(count))
+				vDSP_vsmul($0.ref, 1, [1.0/Float(65536)], $0.ref, 1, vDSP_Length(count))
+			}
+			
+			let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+			distributor.reset(commandBuffer: commandBuffer)
+			distributor.collect(commandBuffer: commandBuffer, χ: χ, μ: μ, σ: σ)
+			distributor.errorValue(commandBuffer: commandBuffer, Δ: Δx, ψ: ψx)
+			distributor.errorState(commandBuffer: commandBuffer, Δ: Δs, ψ: ψs)
+			commandBuffer.commit()
+			
+			for k in 0..<count {
+				ΔX.ref[k] = ψx.ref[k] - μ.ref[k]
+				ΔS.ref[k] = ψs.ref[k] - 0.5 - 0.5 * erf(μ.ref[k]/σ.ref[k]*Float(M_SQRT1_2))
+			}
+			
+			commandBuffer.waitUntilCompleted()
+			
+			XCTAssert(la_norm_as_float(la_difference(
+				la_matrix_from_float_buffer_nocopy(ΔX.ref, la_count_t(count), 1, 1, hint, nil, attr),
+				la_matrix_from_float_buffer_nocopy(Δx.ref, la_count_t(count), 1, 1, hint, nil, attr)), norm
+				) < 1e-3
+			)
+			
+			XCTAssert(la_norm_as_float(la_difference(
+				la_matrix_from_float_buffer_nocopy(ΔS.ref, la_count_t(count), 1, 1, hint, nil, attr),
+				la_matrix_from_float_buffer_nocopy(Δs.ref, la_count_t(count), 1, 1, hint, nil, attr)), norm
+				) < 1e-3
+			)
+			
+		} catch {
+			XCTFail(String(describing: error))
+		}
+	}
+	
 	func testGaussCollectW() {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
 		do {
@@ -88,50 +145,36 @@ class DistributorTests: XCTestCase {
 				σ: device.makeBuffer(length: MemoryLayout<Float>.size*rows*cols, options: .storageModeShared)
 			)
 			let x: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*cols, options: .storageModeShared)
-			
-			[w.χ, w.μ, w.σ, x].forEach {
+			[x, w.χ, w.μ, w.σ].forEach {
 				let count: Int = $0.length / MemoryLayout<Float>.size
 				arc4random_buf($0.ref, $0.length)
-				vDSP_vflt32(UnsafePointer<Int32>(OpaquePointer($0.ref)), 1, $0.ref, 1, vDSP_Length(count))
+				vDSP_vfltu32(UnsafePointer<UInt32>(OpaquePointer($0.ref)), 1, $0.ref, 1, vDSP_Length(count))
 				vDSP_vsmul($0.ref, 1, [1.0/Float(65536)], $0.ref, 1, vDSP_Length(count))
 				vDSP_vsmul($0.ref, 1, [1.0/Float(65536)], $0.ref, 1, vDSP_Length(count))
-			}
-			
-			do {
-				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-				distributor.collect(commandBuffer: commandBuffer, w: w, x: x, count: cols)
-				commandBuffer.commit()
+				$0.didModifyRange(NSRange(0..<$0.length))
 			}
 			do {
 				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+				distributor.reset(commandBuffer: commandBuffer)
+				distributor.collect(commandBuffer: commandBuffer, w: w, x: x, refer: cols)
 				distributor.synthesize(commandBuffer: commandBuffer, χ: y.χ, μ: y.μ, σ: y.σ)
 				commandBuffer.commit()
 				commandBuffer.waitUntilCompleted()
 			}
 			XCTAssert(la_norm_as_float(la_difference(
 				la_matrix_from_float_buffer_nocopy(y.χ.ref, la_count_t(rows), 1, 1, hint, nil, attr),
-				la_matrix_product(la_matrix_from_float_buffer_nocopy(w.χ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr),
-				                  la_matrix_from_float_buffer_nocopy(x.ref, la_count_t(cols), la_count_t(1), la_count_t(1), hint, nil, attr)
-						)
-					), norm
-				) < 1e-3
+				la_matrix_product(la_matrix_from_float_buffer_nocopy(w.χ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr), la_matrix_from_float_buffer_nocopy(x.ref, la_count_t(cols), la_count_t(1), la_count_t(1), hint, nil, attr))), norm
+				) < 1e-2
 			)
 			XCTAssert(la_norm_as_float(la_difference(
 				la_matrix_from_float_buffer_nocopy(y.μ.ref, la_count_t(rows), 1, 1, hint, nil, attr),
-				la_matrix_product(la_matrix_from_float_buffer_nocopy(w.μ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr),
-				                  la_matrix_from_float_buffer_nocopy(x.ref, la_count_t(cols), la_count_t(1), la_count_t(1), hint, nil, attr)
-				)
-				), norm
-				) < 1e-3
+				la_matrix_product(la_matrix_from_float_buffer_nocopy(w.μ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr), la_matrix_from_float_buffer_nocopy(x.ref, la_count_t(cols), la_count_t(1), la_count_t(1), hint, nil, attr))), norm
+				) < 1e-2
 			)
 			XCTAssert(la_norm_as_float(la_difference(
 				la_matrix_from_float_buffer_nocopy(y.σ.ref, la_count_t(rows), 1, 1, hint, nil, attr),
-				sqrt(la_matrix_product(
-					la_elementwise_product(la_matrix_from_float_buffer_nocopy(w.σ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr), la_matrix_from_float_buffer_nocopy(w.σ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr)),
-					la_elementwise_product(la_matrix_from_float_buffer_nocopy(x.ref, la_count_t(cols), la_count_t(1), la_count_t(1), hint, nil, attr), la_matrix_from_float_buffer_nocopy(x.ref, la_count_t(cols), la_count_t(1), la_count_t(1), hint, nil, attr))
-				))
-				), norm
-				) < 1e-3
+				sqrt(la_matrix_product(la_elementwise_product(la_matrix_from_float_buffer_nocopy(w.σ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr), la_matrix_from_float_buffer_nocopy(w.σ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr)), la_elementwise_product(la_matrix_from_float_buffer_nocopy(x.ref, la_count_t(cols), la_count_t(1), la_count_t(1), hint, nil, attr), la_matrix_from_float_buffer_nocopy(x.ref, la_count_t(cols), la_count_t(1), la_count_t(1), hint, nil, attr))))), norm
+				) < 1e-4
 			)
 		} catch {
 			XCTFail(String(describing: error))
@@ -143,11 +186,6 @@ class DistributorTests: XCTestCase {
 			let count: Int = 1024
 			let distributor: Distributor = try Gauss.factory()(device)(count)
 			let queue: MTLCommandQueue = device.makeCommandQueue()
-			do {
-				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-				distributor.reset(commandBuffer: commandBuffer)
-				commandBuffer.commit()
-			}
 			let y: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) = (
 				χ: device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared),
 				μ: device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared),
@@ -163,6 +201,7 @@ class DistributorTests: XCTestCase {
 			vDSP_vgen([ 4.0], [9.0], c.σ.reference(), 1, vDSP_Length(count))
 			do {
 				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+				distributor.reset(commandBuffer: commandBuffer)
 				distributor.collect(commandBuffer: commandBuffer, χ: c.χ, μ: c.μ, σ: c.σ)
 				distributor.synthesize(commandBuffer: commandBuffer, χ: y.χ, μ: y.μ, σ: y.σ)
 				commandBuffer.commit()
@@ -194,11 +233,6 @@ class DistributorTests: XCTestCase {
 			let count: Int = 1024
 			let distributor: Distributor = try Gauss.factory()(device)(count)
 			let queue: MTLCommandQueue = device.makeCommandQueue()
-			do {
-				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-				distributor.reset(commandBuffer: commandBuffer)
-				commandBuffer.commit()
-			}
 			let y: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) = (
 				χ: device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared),
 				μ: device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared),
@@ -216,6 +250,7 @@ class DistributorTests: XCTestCase {
 			vDSP_vgen([10.0], [1.0], d.reference(), 1, vDSP_Length(count))
 			do {
 				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+				distributor.reset(commandBuffer: commandBuffer)
 				distributor.collect(commandBuffer: commandBuffer, r: d, x: (χ: c.χ, μ: c.μ, σ: c.σ))
 				distributor.synthesize(commandBuffer: commandBuffer, χ: y.χ, μ: y.μ, σ: y.σ)
 				commandBuffer.commit()
@@ -226,7 +261,7 @@ class DistributorTests: XCTestCase {
 					la_matrix_from_float_buffer_nocopy(d.ref, la_count_t(count), 1, 1, hint, nil, attr),
 					la_matrix_from_float_buffer_nocopy(c.χ.ref, la_count_t(count), 1, 1, hint, nil, attr)
 				), la_matrix_from_float_buffer_nocopy(y.χ.ref, la_count_t(count), 1, 1, hint, nil, attr)
-				), la_norm_t(LA_L2_NORM)
+				), norm
 				) < 1e-3
 			)
 			XCTAssert(la_norm_as_float(la_difference(
@@ -234,7 +269,7 @@ class DistributorTests: XCTestCase {
 					la_matrix_from_float_buffer_nocopy(d.ref, la_count_t(count), 1, 1, hint, nil, attr),
 					la_matrix_from_float_buffer_nocopy(c.μ.ref, la_count_t(count), 1, 1, hint, nil, attr)
 				), la_matrix_from_float_buffer_nocopy(y.μ.ref, la_count_t(count), 1, 1, hint, nil, attr)
-				), la_norm_t(LA_L2_NORM)
+				), norm
 				) < 1e-3
 			)
 			XCTAssert(la_norm_as_float(la_difference(
@@ -242,7 +277,7 @@ class DistributorTests: XCTestCase {
 					la_matrix_from_float_buffer_nocopy(d.ref, la_count_t(count), 1, 1, hint, nil, attr),
 					la_matrix_from_float_buffer_nocopy(c.σ.ref, la_count_t(count), 1, 1, hint, nil, attr)
 				),	la_matrix_from_float_buffer_nocopy(y.σ.ref, la_count_t(count), 1, 1, hint, nil, attr)
-				), la_norm_t(LA_L2_NORM)
+				), norm
 				) < 1e-3
 			)
 		} catch {
@@ -453,5 +488,17 @@ extension la_object_t {
 			la_matrix_to_float_buffer($0, cols, self)
 			})
 		try data.write(to: to)
+	}
+	var array: Array<Float> {
+		let rows: UInt = la_matrix_rows(self)
+		let cols: UInt = la_matrix_cols(self)
+		let array: Array<Float> = Array<Float>(repeating: 0, count: Int(rows*cols))
+		la_matrix_to_float_buffer(UnsafeMutablePointer<Float>(mutating: array), cols, self)
+		return array
+	}
+}
+extension MTLBuffer {
+	public func reference<T>() -> UnsafeMutablePointer<T> {
+		return UnsafeMutablePointer<T>(OpaquePointer(contents()))
 	}
 }
