@@ -69,7 +69,7 @@ class OptimizerTests: XCTestCase {
 			optimizer.reset(commandBuffer: reset)
 			reset.commit()
 			
-			(0..<1024*4).forEach { (_) in
+			(0..<1024).forEach { (_) in
 				do {
 					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
 					if drand48() < 1.0 {
@@ -81,7 +81,7 @@ class OptimizerTests: XCTestCase {
 				}
 				do {
 					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-					optimizer.encode(commandBuffer: commandBuffer, θ: θ, Δθ: Δθ)
+					optimizer.optimize(commandBuffer: commandBuffer, θ: θ, Δ: Δθ)
 					commandBuffer.commit()
 				}
 			}
@@ -105,6 +105,9 @@ class OptimizerTests: XCTestCase {
 	}
 	func testMomentum() {
 		optimizerTests(factory: Momentum.factory(η: 1e-3, γ: 0.9))
+	}
+	func testSMORMS3() {
+		optimizerTests(factory: SMORMS3.factory(α: 1e-3, ε: 1e-12))
 	}
 	func testStochasticGradientDescent() {
 		optimizerTests(factory: StochasticGradientDescent.factory(η: 1e-3))

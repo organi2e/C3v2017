@@ -84,6 +84,54 @@ kernel void div(device float4x4 * const z [[ buffer(0) ]],
 	if ( can.z ) z[idx.z] = float4x4(yx[0]/xx[0], yy[1]/xy[1], yz[2]/xz[2], yw[3]/xw[3]);
 	if ( can.w ) z[idx.w] = float4x4(yx[0]/xx[0], yy[1]/xy[1], yz[2]/xz[2], yw[3]/xw[3]);
 }
+kernel void gemm(device float * const C [[ buffer(0) ]],
+				 device float const * const A [[ buffer(1) ]],
+				 device float const * const B [[ buffer(2) ]],
+				 constant uint4 const & mnkl [[ buffer(3) ]],
+				 threadgroup float4x4 * const sharedA [[ threadgroup(0) ]],
+				 threadgroup float4x4 * const sharedB [[ threadgroup(1) ]],
+				 uint2 const t [[ thread_position_in_threadgroup ]],
+				 uint2 const g [[ threadgroup_position_in_grid ]]) {
+	int const M = mnkl.x;
+	int const N = mnkl.y;
+	int const K = mnkl.z;
+	int const L = mnkl.w;
+	threadgroup float4x4 * const cacheA = sharedA + t.x * L;
+	threadgroup float4x4 * const cacheB = sharedB + t.y * L;
+	float4x4 ra, rb, rc(0);
+	int2 const b = 4 * int2(g*L+t);
+	bool4 const arm = b.x + int4(0, 1, 2, 3) < M;
+	bool4 const bcm = b.y + int4(0, 1, 2, 3) < N;
+	for ( int4 p = 4 * int4(t.x, t.y, 0, L) ; p.z < K ; p.xyz += p.w ) {
+		bool4 const brm = p.x + int4(0, 1, 2, 3) < K;
+		bool4 const acm = p.y + int4(0, 1, 2, 3) < K;
+		for ( int3 row = int3(b.x, p.x, 0) ; row.z < 4 ; ++ row ) {
+			ra [ row.z ] = select(0, *(device float4*)(A + row.x * K + p.y), arm [ row.z ] && acm );
+			rb [ row.z ] = select(0, *(device float4*)(B + row.y * N + b.y), brm [ row.z ] && bcm );
+			//for ( int3 col = int3(p.y, b.y, 0); col.z < 4 ; ++ col ) {
+			//	ra [ row.z ] [ col.z ] = arm [ row.z ] && acm [ col.z ] ? A [ row.x * K + col.x ] : 0;
+			//	rb [ row.z ] [ col.z ] = brm [ row.z ] && bcm [ col.z ] ? B [ row.y * N + col.y ] : 0;
+			//}
+		}
+		threadgroup_barrier(mem_flags::mem_threadgroup);
+		cacheA[t.y] = ra;
+		cacheB[t.x] = rb;
+		threadgroup_barrier(mem_flags::mem_threadgroup);
+		for ( int l = 0 ; l < L ; ++ l ) {
+			//	rc += cacheB[l] * cacheA[l];//slow
+			ra = cacheA[l]; rb = cacheB[l];
+			rc[0] += rb * ra[0];
+			rc[1] += rb * ra[1];
+			rc[2] += rb * ra[2];
+			rc[3] += rb * ra[3];
+		}
+	}
+	for ( int2 row = int2(0, b.x) ; row.x < 4 ; ++ row ) {
+		for ( int2 col = int2(0, b.y) ; col.x < 4 ; ++ col ) {
+			if ( arm [ row.x ] && bcm [ col.x ] ) C [ row.y * N + col.y ] = rc [ row.x ] [ col.x ];
+		}
+	}
+}
 kernel void gemm16(device float4x4 * const C [[ buffer(0) ]],
 				   device float4x4 const * const A [[ buffer(1) ]],
 				   device float4x4 const * const B [[ buffer(2) ]],

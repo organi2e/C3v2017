@@ -8,6 +8,7 @@
 
 import Metal
 
+
 public protocol Stochastic {
 	
 	func shuffle(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer, count: Int)
@@ -18,6 +19,27 @@ public protocol Stochastic {
 	func deltaValue(commandBuffer: MTLCommandBuffer, Δμ: MTLBuffer, Δσ: MTLBuffer, Δ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer					)
 	
 }
+public protocol Derivative {
+	
+	func jacobian(commandBuffer: MTLCommandBuffer, j: (μ: MTLBuffer, σ: MTLBuffer), w: (μ: MTLBuffer, σ: MTLBuffer), x: MTLBuffer, width: Int, refer: Int)//jμA, jσA
+	func jacobian(commandBuffer: MTLCommandBuffer, j: (μ: MTLBuffer, σ: MTLBuffer), c: (μ: MTLBuffer, σ: MTLBuffer), width: Int)//jμC, jσC
+	
+	func jacobian(commandBuffer: MTLCommandBuffer, jμ: MTLBuffer, x: MTLBuffer, refer: Int)//μa
+	func jacobian(commandBuffer: MTLCommandBuffer, jμ: MTLBuffer, b: MTLBuffer, j: MTLBuffer, p: MTLBuffer, refer: Int)//μb
+	func jacobian(commandBuffer: MTLCommandBuffer, jμ: MTLBuffer, c: MTLBuffer)//μc
+	func jacobian(commandBuffer: MTLCommandBuffer, jμ: MTLBuffer, d: MTLBuffer, p: MTLBuffer, refer: Int)//μd
+
+	func jacobian(commandBuffer: MTLCommandBuffer, jμ: MTLBuffer, w: MTLBuffer, refer: Int)//μx
+	
+	func jacobian(commandBuffer: MTLCommandBuffer, jσ: MTLBuffer, w: MTLBuffer, x: MTLBuffer, refer: Int)//σa
+	func jacobian(commandBuffer: MTLCommandBuffer, jσ: MTLBuffer, b: MTLBuffer, j: MTLBuffer, p: MTLBuffer, refer: Int)//σb
+	func jacobian(commandBuffer: MTLCommandBuffer, jσ: MTLBuffer, c: MTLBuffer)//σc
+	func jacobian(commandBuffer: MTLCommandBuffer, jσ: MTLBuffer, d: MTLBuffer, p: MTLBuffer, refer: Int)//σd
+	
+	//func jacobian(commandBuffer: MTLCommandBuffer, jμ: MTLBuffer, w: MTLBuffer, refer: Int)//σx
+	
+	func clear(commandBuffer: MTLCommandBuffer, j: (μ: MTLBuffer, σ: MTLBuffer))
+}
 public protocol Synthesis {
 	func synthesize(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer)
 	func collect(commandBuffer: MTLCommandBuffer, χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer)
@@ -25,7 +47,7 @@ public protocol Synthesis {
 	func collect(commandBuffer: MTLCommandBuffer, w: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer), x: MTLBuffer, refer: Int)
 	func reset(commandBuffer: MTLCommandBuffer)
 }
-public protocol Distributor: Stochastic, Synthesis {
+public protocol Distributor: Stochastic, Synthesis, Derivative {
 	
 }
 extension MTLLibrary {

@@ -6,6 +6,7 @@
 //
 //
 
+/*
 import Accelerate
 import Distributor
 import XCTest
@@ -66,7 +67,7 @@ class DistributorTests: XCTestCase {
 			XCTFail(String(describing: error))
 		}
 	}
-
+	
 	func testGaussError() {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
 		do {
@@ -221,7 +222,7 @@ class DistributorTests: XCTestCase {
 				la_norm_as_float(la_difference(
 					la_matrix_from_float_buffer_nocopy(c.σ.ref, la_count_t(count), 1, 1, hint, nil, attr),
 					la_matrix_from_float_buffer_nocopy(y.σ.ref, la_count_t(count), 1, 1, hint, nil, attr)), norm
-				) < 1e-3
+					) < 1e-3
 			)
 		} catch {
 			XCTFail(String(describing: error))
@@ -284,188 +285,363 @@ class DistributorTests: XCTestCase {
 			XCTFail(String(describing: error))
 		}
 	}
-	/*
-	func testGaussSynthesize() {
+}
+extension DistributorTests {
+	func testJacobianμA() {
+		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
+		do {
+			let width: Int = 64
+			let refer: Int = 128
+			let distributor: Distributor = try Gauss.factory()(device)(width)
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			let jμ: MTLBuffer = device.makeBuffer(length: width*width*refer*MemoryLayout<Float>.size, options: .storageModeShared)
+			let jσ: MTLBuffer = device.makeBuffer(length: width*width*refer*MemoryLayout<Float>.size, options: .storageModeShared)
+			let x: MTLBuffer = device.makeBuffer(length: refer*MemoryLayout<Float>.size, options: .storageModeShared)
+			
+			shuffle(array: [x])
+			
+			let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+			distributor.clear(commandBuffer: commandBuffer, jμ: jμ, jσ: jσ)
+			distributor.jacobian(commandBuffer: commandBuffer, jμ: jμ, x: x, refer: refer)
+			commandBuffer.commit()
+			commandBuffer.waitUntilCompleted()
+			let la_x: la_object_t = la_matrix_from_float_buffer_nocopy(x.ref, la_count_t(refer), la_count_t(1), la_count_t(1), hint, nil, attr)
+			let la_o: la_object_t = la_vector_from_splat(la_splat_from_float(1.0, attr), la_count_t(width))
+			la_matrix_to_float_buffer(jσ.ref, la_count_t((width+1)*refer), la_outer_product(la_o, la_x))
+			let la_A: la_object_t = la_matrix_from_float_buffer_nocopy(jμ.ref, la_count_t(width), la_count_t(width*refer), la_count_t(width*refer), hint, nil, attr)
+			let la_B: la_object_t = la_matrix_from_float_buffer_nocopy(jσ.ref, la_count_t(width), la_count_t(width*refer), la_count_t(width*refer), hint, nil, attr)
+			let la_C: la_object_t = la_difference(la_A, la_B)
+			
+			XCTAssert(la_status(la_C)==0)
+			XCTAssert(la_norm_as_float(la_C, norm)<1e-3)
+			
+			//try la_A.write(to: URL(fileURLWithPath: "/tmp/a.raw"))
+			//try la_B.write(to: URL(fileURLWithPath: "/tmp/b.raw"))
+
+		} catch {
+			XCTFail(String(describing: error))
+		}
+	}
+	func testJacobianμB() {
+		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
+		do {
+			let width: Int = 72
+			let refer: Int = 159
+			let distributor: Distributor = try Gauss.factory()(device)(width)
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			let jμ: MTLBuffer = device.makeBuffer(length: width * width * refer * MemoryLayout<Float>.size, options: .storageModeShared)
+			let jσ: MTLBuffer = device.makeBuffer(length: width * width * refer * MemoryLayout<Float>.size, options: .storageModeShared)
+			let b: MTLBuffer = device.makeBuffer(length: width * width * MemoryLayout<Float>.size, options: .storageModeShared)
+			let j: MTLBuffer = device.makeBuffer(length: width * MemoryLayout<Float>.size, options: .storageModeShared)
+			let p: MTLBuffer = device.makeBuffer(length: width * width * refer * MemoryLayout<Float>.size, options: .storageModeShared)
+			shuffle(array: [b, j, p])
+			do {
+				//measure {
+				do {
+					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+					distributor.clear(commandBuffer: commandBuffer, jμ: jμ, jσ: jσ)
+					distributor.jacobian(commandBuffer: commandBuffer, jμ: jμ, b: b, j: j, p: p, refer: refer) //ub
+					commandBuffer.commit()
+					commandBuffer.waitUntilCompleted()
+				}
+				let rows: la_count_t = la_count_t(width)
+				let cols: la_count_t = la_count_t(width*refer)
+				let la_jμ: la_object_t = la_matrix_from_float_buffer_nocopy(jμ.ref, rows, cols, cols, hint, nil, attr)
+				let la_b: la_object_t = la_matrix_from_float_buffer_nocopy(b.ref, rows, rows, rows, hint, nil, attr)
+				let la_df: la_object_t = la_diagonal_matrix_from_vector(la_matrix_from_float_buffer_nocopy(j.ref, rows, 1, 1, hint, nil, attr), 0)
+				let la_p: la_object_t = la_matrix_from_float_buffer_nocopy(p.ref, rows, cols, cols, hint, nil, attr)
+				let la_A: la_object_t = la_jμ
+				let la_B: la_object_t = la_matrix_product(la_b, la_matrix_product(la_df, la_p))
+				let la_C: la_object_t = la_difference(la_A, la_B)
+				XCTAssert(la_status(la_C) == 0)
+				XCTAssert(la_norm_as_float(la_C, norm)<1e-3)
+			}
+		} catch {
+			XCTFail(String(describing: error))
+		}
+	}
+	func testJacobianμC() {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
 		do {
 			let count: Int = 1024
 			let distributor: Distributor = try Gauss.factory()(device)(count)
-			
-			let Σ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) = (
-				χ: device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared),
-				μ: device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared),
-				σ: device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
-			)
-			
-			let ϝ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) = (
-				χ: device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared),
-				μ: device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared),
-				σ: device.makeBuffer(length: MemoryLayout<Float>.size*count, options: .storageModeShared)
-			)
-			
-			vDSP_vgen([-1.0], [1.0], Σ.χ.reference(), 1, vDSP_Length(count))
-			vDSP_vgen([-2.0], [2.0], Σ.μ.reference(), 1, vDSP_Length(count))
-			vDSP_vgen([ 4.0], [9.0], Σ.σ.reference(), 1, vDSP_Length(count))
-			
-			let commandQueue: MTLCommandQueue = device.makeCommandQueue()
-			measure {
-				for _ in 0..<256 {
-					let commandBuffer: MTLCommandBuffer = commandQueue.makeCommandBuffer()
-					distributor.synthesize(commandBuffer: commandBuffer, χ: ϝ.χ, μ: Σ.μ, σ: Σ.σ)
-					commandBuffer.commit()
-				}
-				let commandBuffer: MTLCommandBuffer = commandQueue.makeCommandBuffer()
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			let jμ: MTLBuffer = device.makeBuffer(length: count*count*MemoryLayout<Float>.size, options: .storageModeShared)
+			let jσ: MTLBuffer = device.makeBuffer(length: count*count*MemoryLayout<Float>.size, options: .storageModeShared)
+			let c: MTLBuffer = device.makeBuffer(length: count*MemoryLayout<Float>.size, options: .storageModeShared)
+			shuffle(array: [c])
+			do {
+				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+				distributor.clear(commandBuffer: commandBuffer, jμ: jμ, jσ: jσ)
+				distributor.jacobian(commandBuffer: commandBuffer, jμ: jμ, c: c)
 				commandBuffer.commit()
 				commandBuffer.waitUntilCompleted()
-			
 			}
+			let la_A: la_object_t = la_matrix_from_float_buffer_nocopy(jμ.ref, la_count_t(count), la_count_t(count), la_count_t(count), hint, nil, attr)
+			let la_B: la_object_t = la_identity_matrix(la_count_t(count), la_scalar_type_t(LA_SCALAR_TYPE_FLOAT), attr)
+			let la_C: la_object_t = la_difference(la_A, la_B)
+			XCTAssert(la_status(la_C)==0)
+			XCTAssert(la_norm_as_float(la_C, norm)<1e-3)
+		} catch {
+			XCTFail(String(describing: error))
+		}
+	}
+	func testJacobianμD() {
+		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
+		do {
+			let width: Int = 64
+			let refer: Int = 128
+			let distributor: Distributor = try Gauss.factory()(device)(width)
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			let jμ: MTLBuffer = device.makeBuffer(length: width*width*refer*MemoryLayout<Float>.size, options: .storageModeShared)
+			let jσ: MTLBuffer = device.makeBuffer(length: width*width*refer*MemoryLayout<Float>.size, options: .storageModeShared)
+			let d: MTLBuffer = device.makeBuffer(length: width*MemoryLayout<Float>.size, options: .storageModeShared)
+			let p: MTLBuffer = device.makeBuffer(length: width*width*refer*MemoryLayout<Float>.size, options: .storageModeShared)
+			shuffle(array: [d, p])
 			do {
-				let commandBuffer: MTLCommandBuffer = commandQueue.makeCommandBuffer()
+				//measure {
+				do {
+					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+					distributor.clear(commandBuffer: commandBuffer, jμ: jμ, jσ: jσ)
+					distributor.jacobian(commandBuffer: commandBuffer, jμ: jμ, d: d, p: p, refer: refer)
+					commandBuffer.commit()
+					commandBuffer.waitUntilCompleted()
+				}
+				let la_d: la_object_t = la_diagonal_matrix_from_vector(la_matrix_from_float_buffer_nocopy(d.ref, la_count_t(width), la_count_t(1), la_count_t(1), hint, nil, attr), la_index_t(0))
+				let la_p: la_object_t = la_matrix_from_float_buffer_nocopy(p.ref, la_count_t(width), la_count_t(width*refer), la_count_t(width*refer), hint, nil, attr)
+				let la_A: la_object_t = la_matrix_from_float_buffer_nocopy(jμ.ref, la_count_t(width), la_count_t(width*refer), la_count_t(width*refer), hint, nil, attr)
+				let la_B: la_object_t = la_matrix_product(la_d, la_p)
+				let la_C: la_object_t = la_difference(la_A, la_B)
+				XCTAssert(la_status(la_C) == 0)
+				XCTAssert(la_norm_as_float(la_C, norm)<1e-9)
+			}
+		} catch {
+			XCTFail(String(describing: error))
+		}
+	}
+	func testJacobianμX() {
+		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
+		do {
+			let count: Int = 1024
+			let distributor: Distributor = try Gauss.factory()(device)(count)
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			let jμ: MTLBuffer = device.makeBuffer(length: count*count*MemoryLayout<Float>.size, options: .storageModeShared)
+			let jσ: MTLBuffer = device.makeBuffer(length: count*count*MemoryLayout<Float>.size, options: .storageModeShared)
+			let w: MTLBuffer = device.makeBuffer(length: count*count*MemoryLayout<Float>.size, options: .storageModeShared)
+			shuffle(array: [w])
+			do {
+				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+				distributor.clear(commandBuffer: commandBuffer, jμ: jμ, jσ: jσ)
+				distributor.jacobian(commandBuffer: commandBuffer, jμ: jμ, w: w, refer: count)
+				commandBuffer.commit()
+				commandBuffer.waitUntilCompleted()
+			}
+			let la_w: la_object_t = la_matrix_from_float_buffer_nocopy(w.ref, la_count_t(count), la_count_t(count), la_count_t(count), hint, nil, attr)
+			let la_A: la_object_t = la_matrix_from_float_buffer_nocopy(jμ.ref, la_count_t(count), la_count_t(count), la_count_t(count), hint, nil, attr)
+			let la_B: la_object_t = la_w
+			let la_C: la_object_t = la_difference(la_A, la_B)
+			XCTAssert(la_status(la_C)==0)
+			XCTAssert(la_norm_as_float(la_C, norm)<1e-3)
+		} catch {
+			XCTFail(String(describing: error))
+		}
+	}
+}
+extension DistributorTests {
+	func testJacobianσA() {
+		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
+		do {
+			let width: Int = 64
+			let refer: Int = 128
+			let distributor: Distributor = try Gauss.factory()(device)(width)
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			
+			let jσ: MTLBuffer = device.makeBuffer(length: width * width * refer * MemoryLayout<Float>.size, options: .storageModeShared)
+			let jμ: MTLBuffer = device.makeBuffer(length: width * width * refer * MemoryLayout<Float>.size, options: .storageModeShared)
+			
+			let w: MTLBuffer = device.makeBuffer(length: width * refer * MemoryLayout<Float>.size, options: .storageModeShared)
+			
+			let χ: MTLBuffer = device.makeBuffer(length: width * MemoryLayout<Float>.size, options: .storageModeShared)
+			let μ: MTLBuffer = device.makeBuffer(length: width * MemoryLayout<Float>.size, options: .storageModeShared)
+			let σ: MTLBuffer = device.makeBuffer(length: width * MemoryLayout<Float>.size, options: .storageModeShared)
+			let λ: MTLBuffer = device.makeBuffer(length: width * MemoryLayout<Float>.size, options: .storageModeShared)
+			
+			let x: MTLBuffer = device.makeBuffer(length: refer * MemoryLayout<Float>.size, options: .storageModeShared)
+			shuffle(array: [w, χ, μ, σ, x])
+			
+			let rows: la_count_t = la_count_t(width)
+			let cols: la_count_t = la_count_t(width*refer)
+			
+//			vDSP_vfill([1.0], σ.ref, 1, vDSP_Length(width))
+			do {
+				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
 				distributor.reset(commandBuffer: commandBuffer)
+				distributor.clear(commandBuffer: commandBuffer, jμ: jμ, jσ: jσ)
+				distributor.collect(commandBuffer: commandBuffer, χ: χ, μ: μ, σ: σ)
 				commandBuffer.commit()
 			}
+			let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+			distributor.jacobian(commandBuffer: commandBuffer, jσ: jσ, w: w, x: x, refer: refer)
+			commandBuffer.commit()
+			commandBuffer.waitUntilCompleted()
 			
+			vvrecf(λ.ref, σ.ref, [Int32(width)])
 			
+			let la_λ: la_object_t = la_matrix_from_float_buffer_nocopy(λ.ref, la_count_t(width), 1, 1, hint, nil, attr)
+			let la_w: la_object_t = la_matrix_from_float_buffer_nocopy(w.ref, la_count_t(width), la_count_t(refer), la_count_t(refer), hint, nil, attr)
+			let la_x: la_object_t = la_matrix_from_float_buffer_nocopy(x.ref, la_count_t(refer), 1, 1, hint, nil, attr)
+
+			let la_y: la_object_t = la_elementwise_product(la_w, la_outer_product(la_λ, la_elementwise_product(la_x, la_x)))
 			
-			do {
-				var E: Float = 0
-				for k in 0..<count {
-					let e: Float = ϝ.χ.ref[k] - step(Σ.χ.ref[k], edge: 0)
-					E += e * e
-				}
-				XCTAssert(E/Float(count)<1e-3)
-			}
-			do {
-				var E: Float = 0
-				for k in 0..<count {
-					let e: Float = ϝ.μ.ref[k] - Σ.μ.ref[k]
-					E += e * e
-				}
-				XCTAssert(E/Float(count)<1e-3)
-			}
-			do {
-				var E: Float = 0
-				for k in 0..<count {
-					let e: Float = ϝ.σ.ref[k] - sqrt(Σ.σ.ref[k])
-					E += e * e
-				}
-				XCTAssert(E/Float(count)<1e-3)
-			}
+			la_matrix_to_float_buffer(jμ.ref, la_count_t((width+1)*refer), la_y)
+			
+			let la_A: la_object_t = la_matrix_from_float_buffer_nocopy(jσ.ref, rows, cols, cols, hint, nil, attr)
+			let la_B: la_object_t = la_matrix_from_float_buffer_nocopy(jμ.ref, rows, cols, cols, hint, nil, attr)
+			let la_C: la_object_t = la_difference(la_A, la_B)
+			
+			XCTAssert(la_status(la_C) == 0)
+			
+			let rmse: Float = la_norm_as_float(la_C, norm)
+			
+			XCTAssert( rmse < 1e-3 && !rmse.isNaN )
+			
+			//try la_A.write(to: URL(fileURLWithPath: "/tmp/a.raw"))
+			//try la_B.write(to: URL(fileURLWithPath: "/tmp/b.raw"))
+			
 		} catch {
 			XCTFail(String(describing: error))
 		}
 	}
-	*/
+	func testJacobianσC() {
+		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
+		do {
+			let width: Int = 1001
+			
+			let distributor: Distributor = try Gauss.factory()(device)(width)
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			
+			let jμ: MTLBuffer = device.makeBuffer(length: width*width*MemoryLayout<Float>.size, options: .storageModeShared)
+			let jσ: MTLBuffer = device.makeBuffer(length: width*width*MemoryLayout<Float>.size, options: .storageModeShared)
+			
+			let χ: MTLBuffer = device.makeBuffer(length: width * MemoryLayout<Float>.size, options: .storageModeShared)
+			let μ: MTLBuffer = device.makeBuffer(length: width * MemoryLayout<Float>.size, options: .storageModeShared)
+			let σ: MTLBuffer = device.makeBuffer(length: width * MemoryLayout<Float>.size, options: .storageModeShared)
+			let λ: MTLBuffer = device.makeBuffer(length: width * MemoryLayout<Float>.size, options: .storageModeShared)
+			
+			let c: MTLBuffer = device.makeBuffer(length: width*MemoryLayout<Float>.size, options: .storageModeShared)
+			shuffle(array: [χ, μ, σ, c])
+			
+			do {
+				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+				distributor.reset(commandBuffer: commandBuffer)
+				distributor.clear(commandBuffer: commandBuffer, jμ: jμ, jσ: jσ)
+				distributor.collect(commandBuffer: commandBuffer, χ: χ, μ: μ, σ: σ)
+				commandBuffer.commit()
+			}
+			let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+			distributor.jacobian(commandBuffer: commandBuffer, jσ: jσ, c: c)
+			commandBuffer.commit()
+			commandBuffer.waitUntilCompleted()
+			
+			vvrecf(λ.ref, σ.ref, [Int32(width)])
+			
+			let la_λ: la_object_t = la_matrix_from_float_buffer_nocopy(λ.ref, la_count_t(width), 1, 1, hint, nil, attr)
+			let la_c: la_object_t = la_matrix_from_float_buffer_nocopy(c.ref, la_count_t(width), 1, 1, hint, nil, attr)
+			
+			let la_A: la_object_t = la_matrix_from_float_buffer_nocopy(jσ.ref, la_count_t(width), la_count_t(width), la_count_t(width), hint, nil, attr)
+			let la_B: la_object_t = la_diagonal_matrix_from_vector(la_elementwise_product(la_λ, la_c), 0)
+			let la_C: la_object_t = la_difference(la_A, la_B)
+			
+			XCTAssert(la_status(la_C) == 0)
+			
+			let rmse: Float = la_norm_as_float(la_C, norm)
+			
+			XCTAssert( rmse < 1e-3 && !rmse.isNaN )
+			
+		} catch {
+			XCTFail(String(describing: error))
+		}
+	}
 	/*
-	func testSynthesize() {
+	func testJacobianUD() {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
 		do {
-			let computer: Computer = try Computer(device: device)
-			let count: Int = 65536
-			guard let distributor: Gauss = try Gauss.make()(computer)(count) as? Gauss else { XCTFail()(); return }
+			let width: Int = 64
+			let refer: Int = 128
+			let distributor: Distributor = try Gauss.factory()(device)(width)
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			let jμ: MTLBuffer = device.makeBuffer(length: width * width * refer * MemoryLayout<Float>.size, options: .storageModeShared)
+			let jσ: MTLBuffer = device.makeBuffer(length: width * width * refer * MemoryLayout<Float>.size, options: .storageModeShared)
+			let b: MTLBuffer = device.makeBuffer(length: width * width * MemoryLayout<Float>.size, options: .storageModeShared)
+			let df: MTLBuffer = device.makeBuffer(length: width * MemoryLayout<Float>.size, options: .storageModeShared)
+			let p: MTLBuffer = device.makeBuffer(length: width * width * refer * MemoryLayout<Float>.size, options: .storageModeShared)
+			shuffle(array: [b, df, p])
+			do {
+				//measure {
+				do {
+					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+					distributor.clear(commandBuffer: commandBuffer, jμ: jμ, jσ: jσ)
+					distributor.jacobian(commandBuffer: commandBuffer, jμ: jμ, b: b, df: df, p: p, refer: refer) //ub
+					commandBuffer.commit()
+					commandBuffer.waitUntilCompleted()
+				}
+				let rows: la_count_t = la_count_t(width)
+				let cols: la_count_t = la_count_t(width*refer)
+				let la_jμ: la_object_t = la_matrix_from_float_buffer_nocopy(jμ.ref, rows, cols, cols, hint, nil, attr)
+				let la_b: la_object_t = la_matrix_from_float_buffer_nocopy(b.ref, rows, rows, rows, hint, nil, attr)
+				let la_df: la_object_t = la_diagonal_matrix_from_vector(la_matrix_from_float_buffer_nocopy(df.ref, rows, 1, 1, hint, nil, attr), 0)
+				let la_p: la_object_t = la_matrix_from_float_buffer_nocopy(p.ref, rows, cols, cols, hint, nil, attr)
+				let la_A: la_object_t = la_jμ
+				let la_B: la_object_t = la_matrix_product(la_b, la_matrix_product(la_df, la_p))
+				let la_C: la_object_t = la_difference(la_A, la_B)
+				XCTAssert(la_status(la_C) == 0)
+				XCTAssert(la_norm_as_float(la_C, norm)<1e-3)
+				try la_A.write(to: URL(fileURLWithPath: "/tmp/a.raw"))
+				try la_B.write(to: URL(fileURLWithPath: "/tmp/b.raw"))
+			}
 		} catch {
 			XCTFail(String(describing: error))
 		}
-		
 	}
-	
-	func testGradient() {
-		
-	}
-	
-	func testCollectC() {
-		guard let device: Device = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
+	func testJacobianUX() {
+		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
 		do {
-			let computer: Computer = try Computer(device: device)
 			let count: Int = 1024
-			guard let distributor: Gauss = try Gauss.make()(computer)(count) as? Gauss else { XCTFail(); return }
-			
-			distributor.clear()
-			
-			
-		} catch {
-			XCTFail(String(describing: error))
-		}
-	}
-	
-	func testGaussCollectA() {
-		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }
-		do {
-			let computer: Computer = try Computer(device: device)
-			
-			let hint: la_hint_t = la_hint_t(LA_ATTRIBUTE_ENABLE_LOGGING)
-			let attr: la_attribute_t = la_attribute_t(LA_DEFAULT_ATTRIBUTES)
-			let norm: la_norm_t = la_norm_t(LA_L2_NORM)
-			
-			let count: (rows: Int, cols: Int) = (rows: 1024, cols: 1024)
-			let rows: Int = count.rows
-			let cols: Int = count.cols
-			
-			guard let distributor: Gauss = try Gauss.make()(computer)(rows) as? Gauss else { XCTFail(); return }
-			
-			let Σ: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) = (
-				χ: device.makeBuffer(length: MemoryLayout<Float>.size*rows, options: .storageModeShared),
-				μ: device.makeBuffer(length: MemoryLayout<Float>.size*rows, options: .storageModeShared),
-				σ: device.makeBuffer(length: MemoryLayout<Float>.size*rows, options: .storageModeShared)
-			)
-			let w: (χ: MTLBuffer, μ: MTLBuffer, σ: MTLBuffer) = (
-				χ: device.makeBuffer(length: MemoryLayout<Float>.size*rows*cols, options: .storageModeShared),
-				μ: device.makeBuffer(length: MemoryLayout<Float>.size*rows*cols, options: .storageModeShared),
-				σ: device.makeBuffer(length: MemoryLayout<Float>.size*rows*cols, options: .storageModeShared)
-			)
-			
-			let χ: MTLBuffer = device.makeBuffer(length: MemoryLayout<Float>.size*cols, options: .storageModeShared)
-			
-			[w.χ, w.μ, w.σ, χ].forEach {
-				let count: Int = $0.length / MemoryLayout<Float>.size
-				arc4random_buf($0.ref, $0.length)
-				vDSP_vflt32(UnsafePointer<Int32>(OpaquePointer($0.ref)), 1, $0.ref, 1, vDSP_Length(count))
-				vDSP_vsmul($0.ref, 1, [1.0/Float(65536)], $0.ref, 1, vDSP_Length(count))
-				vDSP_vsmul($0.ref, 1, [1.0/Float(65536)], $0.ref, 1, vDSP_Length(count))
+			let distributor: Distributor = try Gauss.factory()(device)(count)
+			let queue: MTLCommandQueue = device.makeCommandQueue()
+			let jμ: MTLBuffer = device.makeBuffer(length: count*count*MemoryLayout<Float>.size, options: .storageModeShared)
+			let jσ: MTLBuffer = device.makeBuffer(length: count*count*MemoryLayout<Float>.size, options: .storageModeShared)
+			let w: MTLBuffer = device.makeBuffer(length: count*count*MemoryLayout<Float>.size, options: .storageModeShared)
+			shuffle(array: [w])
+			do {
+				let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
+				distributor.clear(commandBuffer: commandBuffer, jμ: jμ, jσ: jσ)
+				distributor.jacobian(commandBuffer: commandBuffer, jμ: jμ, w: w, refer: count)
+				commandBuffer.commit()
+				commandBuffer.waitUntilCompleted()
 			}
-			
-			let Σmat: (χ: la_object_t, μ: la_object_t, σ: la_object_t) = (
-				χ: la_matrix_from_float_buffer_nocopy(Σ.χ.ref, la_count_t(rows), la_count_t(1), la_count_t(1), hint, nil, attr),
-				μ: la_matrix_from_float_buffer_nocopy(Σ.μ.ref, la_count_t(rows), la_count_t(1), la_count_t(1), hint, nil, attr),
-				σ: la_matrix_from_float_buffer_nocopy(Σ.σ.ref, la_count_t(rows), la_count_t(1), la_count_t(1), hint, nil, attr)
-			)
-			
-			let wmat: (χ: la_object_t, μ: la_object_t, σ: la_object_t) = (
-				χ: la_matrix_from_float_buffer_nocopy(w.χ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr),
-				μ: la_matrix_from_float_buffer_nocopy(w.μ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr),
-				σ: la_matrix_from_float_buffer_nocopy(w.σ.ref, la_count_t(rows), la_count_t(cols), la_count_t(cols), hint, nil, attr)
-			)
-			let χmat: la_object_t = la_matrix_from_float_buffer_nocopy(χ.ref, la_count_t(cols), la_count_t(1), la_count_t(1), hint, nil, attr)
-			
-			distributor.collect(w: w, x: χ)
-			computer.compute {
-				let encoder: BlitCommandEncoder = $0.makeBlitCommandEncoder()
-				encoder.copy(from: distributor.Σ.χ, sourceOffset: 0, to: Σ.χ, destinationOffset: 0, size: rows*MemoryLayout<Float>.size)
-				encoder.copy(from: distributor.Σ.μ, sourceOffset: 0, to: Σ.μ, destinationOffset: 0, size: rows*MemoryLayout<Float>.size)
-				encoder.copy(from: distributor.Σ.σ, sourceOffset: 0, to: Σ.σ, destinationOffset: 0, size: rows*MemoryLayout<Float>.size)
-				encoder.endEncoding()
-			}
-			computer.wait()
-			
-			let χrmse: Float = la_norm_as_float(la_difference(Σmat.χ, la_matrix_product(wmat.χ, χmat)), norm)
-			let μrmse: Float = la_norm_as_float(la_difference(Σmat.μ, la_matrix_product(wmat.μ, χmat)), norm)
-			let σrmse: Float = la_norm_as_float(la_difference(Σmat.σ, la_matrix_product(la_elementwise_product(wmat.σ, wmat.σ), la_elementwise_product(χmat, χmat))), norm)
-			
-			print("error", χrmse, μrmse, σrmse)
-			
-			XCTAssert(χrmse < 1e-3)
-			XCTAssert(μrmse < 1e-3)
-			XCTAssert(σrmse < 1e-3)
-			
-			//try Σ.σ.write(to: URL(fileURLWithPath: "/tmp/gpu.raw"))
-			//try la_matrix_product(la_elementwise_product(wmat.σ, wmat.σ), la_elementwise_product(χmat, χmat)).write(to: URL(fileURLWithPath: "/tmp/cpu.raw"))
-			
-			
+			let la_w: la_object_t = la_matrix_from_float_buffer_nocopy(w.ref, la_count_t(count), la_count_t(count), la_count_t(count), hint, nil, attr)
+			let la_A: la_object_t = la_matrix_from_float_buffer_nocopy(jμ.ref, la_count_t(count), la_count_t(count), la_count_t(count), hint, nil, attr)
+			let la_B: la_object_t = la_w
+			let la_C: la_object_t = la_difference(la_A, la_B)
+			XCTAssert(la_status(la_C)==0)
+			XCTAssert(la_norm_as_float(la_C, norm)<1e-3)
 		} catch {
 			XCTFail(String(describing: error))
 		}
 	}
 	*/
+}
+extension DistributorTests {
+	func shuffle(array: Array<MTLBuffer>) {
+		array.forEach {
+			let count: vDSP_Length = vDSP_Length($0.length / MemoryLayout<Float>.size)
+			arc4random_buf($0.ref, $0.length)
+			vDSP_vfltu32(UnsafePointer<UInt32>(OpaquePointer($0.contents())), 1, $0.ref, 1, count)
+			vDSP_vsmul($0.ref, 1, [1.0/Float(65536)], $0.ref, 1, count)
+			vDSP_vsmul($0.ref, 1, [1.0/Float(65536)], $0.ref, 1, count)
+		}
+	}
 }
 extension MTLBuffer {
 	var ref: UnsafeMutablePointer<Float> {
@@ -502,3 +678,4 @@ extension MTLBuffer {
 		return UnsafeMutablePointer<T>(OpaquePointer(contents()))
 	}
 }
+*/

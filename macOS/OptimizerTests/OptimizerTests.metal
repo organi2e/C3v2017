@@ -13,14 +13,14 @@ kernel void dydx(device float * const dydx [[ buffer(0) ]],
 				 uint i [[ thread_position_in_grid ]],
 				 uint I [[ threads_per_grid ]]) {
 	const float w[8] = {
-		10000,
+		100000,
 		1000,
 		10,
 		1,
 		1,
 		0.1,
 		0.001,
-		0.0001
+		0.00001
 	};
 	/*
 	 const float w[8] = {
@@ -40,14 +40,14 @@ kernel void dydx2(device float * const dydx [[ buffer(0) ]],
 				  uint i [[ thread_position_in_grid ]],
 				  uint I [[ threads_per_grid ]]) {
 	const float w[8] = {
+		10000,
 		1000,
-		100,
 		10,
 		1,
 		1,
 		0.1,
-		0.01,
-		0.001
+		0.001,
+		0.0001
 	};
 	/*
 	 const float w[8] = {

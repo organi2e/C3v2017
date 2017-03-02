@@ -16,6 +16,8 @@
 		870C4CA01E3D782700AF6DE7 /* Computer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 875931A61E3B6E14006B60FF /* Computer.framework */; };
 		870C4CA11E3D782700AF6DE7 /* Distributor.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 875931251E3B384F006B60FF /* Distributor.framework */; };
 		870C4CA21E3D782700AF6DE7 /* Optimizer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 875931531E3B5BA8006B60FF /* Optimizer.framework */; };
+		872E7FB31E64784C00687895 /* SMORMS3.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872E7FB21E64784C00687895 /* SMORMS3.swift */; };
+		872E7FB51E64785E00687895 /* SMORMS3.metal in Sources */ = {isa = PBXBuildFile; fileRef = 872E7FB41E64785E00687895 /* SMORMS3.metal */; };
 		8740ED531E41A0B400D6B6B1 /* Feedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8740ED521E41A0B400D6B6B1 /* Feedback.swift */; };
 		8759312F1E3B3850006B60FF /* Distributor.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 875931251E3B384F006B60FF /* Distributor.framework */; };
 		875931341E3B3850006B60FF /* DistributorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875931331E3B3850006B60FF /* DistributorTests.swift */; };
@@ -57,6 +59,7 @@
 		87B8F6651E3B8BE500A706F5 /* Cell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87B8F6641E3B8BE500A706F5 /* Cell.swift */; };
 		87B8F6671E3B8BF100A706F5 /* Edge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87B8F6661E3B8BF100A706F5 /* Edge.swift */; };
 		87B8F6691E3B8C0C00A706F5 /* Bias.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87B8F6681E3B8C0C00A706F5 /* Bias.swift */; };
+		87D361FF1E5758FE0074C549 /* GaussDistributorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87D361FE1E5758FE0074C549 /* GaussDistributorTests.swift */; };
 		87DF0E351E49F0BB00103A8F /* Computer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 875931A61E3B6E14006B60FF /* Computer.framework */; };
 		87E979461E3EF9610074F799 /* RingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E979451E3EF9610074F799 /* RingBuffer.swift */; };
 		87EFD6771E4DFEBC00E2EBD6 /* LaObjet.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87B32ABE1E4B0D470080491F /* LaObjet.framework */; };
@@ -107,6 +110,8 @@
 		870C4C621E3CD91E00AF6DE7 /* Distributior.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Distributior.swift; path = ../../Distributior/Distributior.swift; sourceTree = "<group>"; };
 		870C4C631E3CD91E00AF6DE7 /* Gauss.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; name = Gauss.metal; path = ../../Distributior/Gauss.metal; sourceTree = "<group>"; };
 		870C4C641E3CD91E00AF6DE7 /* Gauss.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Gauss.swift; path = ../../Distributior/Gauss.swift; sourceTree = "<group>"; };
+		872E7FB21E64784C00687895 /* SMORMS3.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = SMORMS3.swift; path = ../../Optimizer/SMORMS3.swift; sourceTree = "<group>"; };
+		872E7FB41E64785E00687895 /* SMORMS3.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; name = SMORMS3.metal; path = ../../Optimizer/SMORMS3.metal; sourceTree = "<group>"; };
 		8740ED521E41A0B400D6B6B1 /* Feedback.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Feedback.swift; path = "../../C³/Feedback.swift"; sourceTree = "<group>"; };
 		875931251E3B384F006B60FF /* Distributor.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Distributor.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		875931281E3B384F006B60FF /* Distributor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Distributor.h; sourceTree = "<group>"; };
@@ -162,6 +167,7 @@
 		87B8F6641E3B8BE500A706F5 /* Cell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Cell.swift; path = "../../C³/Cell.swift"; sourceTree = "<group>"; };
 		87B8F6661E3B8BF100A706F5 /* Edge.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Edge.swift; path = "../../C³/Edge.swift"; sourceTree = "<group>"; };
 		87B8F6681E3B8C0C00A706F5 /* Bias.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Bias.swift; path = "../../C³/Bias.swift"; sourceTree = "<group>"; };
+		87D361FE1E5758FE0074C549 /* GaussDistributorTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GaussDistributorTests.swift; sourceTree = "<group>"; };
 		87E979451E3EF9610074F799 /* RingBuffer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = RingBuffer.swift; path = "../../C³/RingBuffer.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -302,6 +308,7 @@
 			isa = PBXGroup;
 			children = (
 				875931331E3B3850006B60FF /* DistributorTests.swift */,
+				87D361FE1E5758FE0074C549 /* GaussDistributorTests.swift */,
 				875931351E3B3850006B60FF /* Info.plist */,
 			);
 			path = DistributorTests;
@@ -318,6 +325,8 @@
 				8759316C1E3B5BC9006B60FF /* Momentum.metal */,
 				8759316F1E3B5BC9006B60FF /* MomentumAdaDelta.swift */,
 				8759316E1E3B5BC9006B60FF /* MomentumAdaDelta.metal */,
+				872E7FB21E64784C00687895 /* SMORMS3.swift */,
+				872E7FB41E64785E00687895 /* SMORMS3.metal */,
 				875931721E3B5BC9006B60FF /* StochasticGradientDescent.swift */,
 				875931711E3B5BC9006B60FF /* StochasticGradientDescent.metal */,
 				875931701E3B5BC9006B60FF /* Optimizer.swift */,
@@ -815,6 +824,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				875931341E3B3850006B60FF /* DistributorTests.swift in Sources */,
+				87D361FF1E5758FE0074C549 /* GaussDistributorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -830,6 +840,8 @@
 				8798A76D1E42CD9300F2CFCE /* Adam.metal in Sources */,
 				875931791E3B5BC9006B60FF /* Optimizer.swift in Sources */,
 				875931741E3B5BC9006B60FF /* AdaDelta.swift in Sources */,
+				872E7FB51E64785E00687895 /* SMORMS3.metal in Sources */,
+				872E7FB31E64784C00687895 /* SMORMS3.swift in Sources */,
 				875931751E3B5BC9006B60FF /* Momentum.metal in Sources */,
 				875931761E3B5BC9006B60FF /* Momentum.swift in Sources */,
 				875931781E3B5BC9006B60FF /* MomentumAdaDelta.swift in Sources */,

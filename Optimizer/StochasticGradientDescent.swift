@@ -63,7 +63,7 @@ public class StochasticGradientDescent {
 			}
 		}
 	}*/
-	public static func factory(η: Float = 1e-3) -> OptimizerFactory {
+	public static func factory(η: Float = 1e-3) -> (MTLDevice) throws -> (Int) -> Optimizer {
 		let bundle: Bundle = Bundle(for: self)
 		let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
 		constantValues.setConstantValue([η], type: .float, withName: "eta")

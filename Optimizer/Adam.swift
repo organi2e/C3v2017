@@ -14,10 +14,10 @@ public class Adam {
 	let groups: MTLSize
 	let threads: MTLSize
 	private init(pipeline: MTLComputePipelineState, count: Int) {
-		groups = MTLSize(width: (count+15)/16, height: 1, depth: 1)
+		groups = MTLSize(width: count, height: 1, depth: 1)
 		threads = MTLSize(width: 1, height: 1, depth: 1)
 		optimizer = pipeline
-		parameters = pipeline.device.makeBuffer(length: 2*16*groups.width*MemoryLayout<Float>.size, options: .storageModePrivate)
+		parameters = pipeline.device.makeBuffer(length: 2*groups.width*MemoryLayout<Float>.size, options: .storageModePrivate)
 	}
 	public static func factory(α: Float = 1e-3, β: Float = 0.9, γ: Float = 0.999, ε: Float = 1e-8) -> (MTLDevice) throws -> (Int) -> Optimizer {
 		let bundle: Bundle = Bundle(for: self)
@@ -39,8 +39,8 @@ public class Adam {
 extension Adam: Optimizer {
 	public func optimize(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δ: MTLBuffer) {
 		
-		assert(16 * groups.width * MemoryLayout<Float>.size<=θ.length)
-		assert(16 * groups.width * MemoryLayout<Float>.size<=Δ.length)
+		assert(groups.width * MemoryLayout<Float>.size<=θ.length)
+		assert(groups.width * MemoryLayout<Float>.size<=Δ.length)
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
 		encoder.setComputePipelineState(optimizer)

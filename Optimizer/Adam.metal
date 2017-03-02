@@ -38,24 +38,21 @@ inline float4x4 mul(float4x4 const a, float4x4 const b) {
 inline float4x4 div(float4x4 const a, float4x4 const b) {
 	return float4x4(a[0]/b[0], a[1]/b[1], a[2]/b[2], a[3]/b[3]);
 }
-struct parameter_t {
-	float4x4 u;
-	float4x4 v;
-};
-kernel void AdamOptimize(device float4x4 * const theta [[ buffer(0) ]],
-						 device parameter_t * const parameters [[ buffer(1) ]],
-						 device const float4x4 * const delta [[ buffer(2) ]],
+kernel void AdamOptimize(device float * const theta [[ buffer(0) ]],
+						 device float2 * const parameters [[ buffer(1) ]],
+						 device const float * const delta [[ buffer(2) ]],
 						 uint const n [[ thread_position_in_grid ]]) {
-	float4x4 const g = delta[n];
-	parameter_t p = parameters[n];
+	int const idx = n;
+	float const g = delta[idx];
+	float2 p = parameters[idx];
 	
-	p.u = mix(g, p.u, beta);
+	p.x = mix(g, p.x, beta);
 	//p.v = mix(fabs(g), p.v, beta);//L1
-	p.v = mix(sq(g), p.v, gamma);//L2
+	p.y = mix(g*g, p.y, gamma);//L2
 	//p.v = max(fabs(g), beta*p.v);//L-Inf
 	
 	//theta[n] += alpha * div(p.u, sup(p.v, epsilon));//L1orL-Inf
-	theta[n] += alpha * mul(p.u, rsqrt(sup(p.v, epsilon)));
+	theta[idx] += alpha * p.x * rsqrt(p.y + epsilon);
 	
-	parameters[n] = p;
+	parameters[idx] = p;
 }
