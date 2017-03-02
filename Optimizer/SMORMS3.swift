@@ -17,7 +17,7 @@ public class SMORMS3 {
 		groups = MTLSize(width: count, height: 1, depth: 1)
 		threads = MTLSize(width: 1, height: 1, depth: 1)
 		optimizer = pipeline
-		parameters = pipeline.device.makeBuffer(length: 4*count*MemoryLayout<Float>.size, options: .storageModePrivate)
+		parameters = pipeline.device.makeBuffer(length: 3*count*MemoryLayout<Float>.size, options: .storageModePrivate)
 	}
 	public static func factory(α: Float = 1e-3, ε: Float = 1e-12) -> (MTLDevice) throws -> (Int) -> Optimizer {
 		let bundle: Bundle = Bundle(for: self)
@@ -37,10 +37,13 @@ public class SMORMS3 {
 extension SMORMS3: Optimizer {
 	public func optimize(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δ: MTLBuffer) {
 		
-		assert(groups.width * MemoryLayout<Float>.size<=θ.length)
-		assert(groups.width * MemoryLayout<Float>.size<=Δ.length)
-		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		
+		assert( optimizer.device === encoder.device )
+		
+		assert( optimizer.device === θ.device && groups.width * MemoryLayout<Float>.size <= θ.length )
+		assert( optimizer.device === Δ.device && groups.width * MemoryLayout<Float>.size <= Δ.length )
+		
 		encoder.setComputePipelineState(optimizer)
 		encoder.setBuffer(θ, offset: 0, at: 0)
 		encoder.setBuffer(parameters, offset: 0, at: 1)

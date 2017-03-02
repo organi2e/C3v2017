@@ -72,7 +72,7 @@ class OptimizerTests: XCTestCase {
 			(0..<1024).forEach { (_) in
 				do {
 					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
-					if drand48() < 1.0 {
+					if drand48() < 0.5 {
 						apply(commandBuffer: commandBuffer, pipeline: gradientN, dydx: Δθ, x: θ)
 					} else {
 						apply(commandBuffer: commandBuffer, pipeline: gradientS, dydx: Δθ, x: θ)
