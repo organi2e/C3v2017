@@ -23,10 +23,10 @@ kernel void SMORMS3Optimize(device float * const theta [[ buffer(0) ]],
 	float const g = delta[idx];
 	
 	//compute
-	float const r = 1/(1+p.x);
+	float const r = 1 / ( 1 + p.x );
 	float const s = rsqrt(p.z = mix(g*g, p.z, r));
 	float const t = select(0.0, s, isnormal(s));//Avoid epsilon
-	float const u = (p.y=mix(g, p.y, r))*t;
+	float const u = (p.y = mix(g, p.y, r)) * t;
 	float const v = abs(u);//or u * u
 	p.x = fma(p.x, 1-v, 1);
 	

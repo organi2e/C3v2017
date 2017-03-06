@@ -14,7 +14,7 @@ import Optimizer
 
 public class Context: NSManagedObjectContext {
 	let computer: Computer
-	let gaussFactory: (Int) -> Distributor
+	let gaussFactory: Distributor
 	let optimizerFactory: (Int) -> Optimizer
 	enum ErrorCases: Error, CustomStringConvertible {
 		case InvalidContext
@@ -37,8 +37,8 @@ public class Context: NSManagedObjectContext {
 	public init(storage: URL? = nil, device: MTLDevice? = nil, concurrencyType: NSManagedObjectContextConcurrencyType = .privateQueueConcurrencyType) throws {
 		guard let device: MTLDevice = device ?? MTLCreateSystemDefaultDevice() else { throw ErrorCases.NoDeviceFound }
 		computer = try Computer(device: device)
-		gaussFactory = try Gauss.factory()(device)
-		optimizerFactory = try Adam.factory()(device)
+		gaussFactory = try GaussDistributor.factory()(device)
+		optimizerFactory = try SMORMS3.factory()(device)
 		super.init(concurrencyType: concurrencyType)
 		guard let model: NSManagedObjectModel = NSManagedObjectModel.mergedModel(from: [Bundle(for: type(of: self))]) else { throw ErrorCases.NoModelFound }
 		let store: NSPersistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
@@ -49,8 +49,8 @@ public class Context: NSManagedObjectContext {
 	public required init?(coder aDecoder: NSCoder) {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { fatalError(ErrorCases.NoDeviceFound.description) }
 		computer = try!Computer(device: device)
-		gaussFactory = try!Gauss.factory()(device)
-		optimizerFactory = try!Adam.factory()(device)
+		gaussFactory = try!GaussDistributor.factory()(device)
+		optimizerFactory = try!SMORMS3.factory()(device)
 		super.init(coder: aDecoder)
 	}
 	public override func encode(with aCoder: NSCoder) {

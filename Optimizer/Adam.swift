@@ -39,10 +39,13 @@ public class Adam {
 extension Adam: Optimizer {
 	public func optimize(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δ: MTLBuffer) {
 		
-		assert(groups.width * MemoryLayout<Float>.size<=θ.length)
-		assert(groups.width * MemoryLayout<Float>.size<=Δ.length)
-		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		
+		assert( optimizer.device === encoder.device )
+		
+		assert( optimizer.device === θ.device && groups.width * MemoryLayout<Float>.size <= θ.length )
+		assert( optimizer.device === Δ.device && groups.width * MemoryLayout<Float>.size <= Δ.length )
+		
 		encoder.setComputePipelineState(optimizer)
 		encoder.setBuffer(θ, offset: 0, at: 0)
 		encoder.setBuffer(parameters, offset: 0, at: 1)

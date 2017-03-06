@@ -186,7 +186,7 @@ kernel void GaussDerivateP(device float * const dU [[ buffer(0) ]],
 	float const x = u / s;
 	//float const p = P[idx];
 	float const d = D[idx];// * select(1.0, p * ( 1.0 - p ), 0.0 < p && p < 1.0);
-	float const j = M_SQRT1_2PI_F*exp(-0.5*x*x);
+	float const j = M_SQRT1_2PI_F * exp( -0.5 * x * x );
 	float const ju = j / s;
 	float const js = ju * -x;
 	dU[idx] = d * (jU[idx] = ju);

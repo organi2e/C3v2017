@@ -33,7 +33,7 @@ kernel void dydx(device float * const dydx [[ buffer(0) ]],
 		1,
 		1
 	 };*/
-	dydx[i] = - w[7-i%8] * (0.7+0.3*cos(x[(i+13)%I]*x[(i+62)%I]/256.0)) * ( x[i] - i - 1 + 64 );
+	dydx[i] = - w[7-i%8] * (0.7+0.3*cos(x[(i+13)%I]*x[(i+62)%I]/1080.0)) * ( x[i] - i - 1 + 64 );
 }
 kernel void dydx2(device float * const dydx [[ buffer(0) ]],
 				  device float const * const x [[ buffer(1) ]],

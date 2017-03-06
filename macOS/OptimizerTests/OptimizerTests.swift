@@ -68,7 +68,6 @@ class OptimizerTests: XCTestCase {
 			let reset: MTLCommandBuffer = queue.makeCommandBuffer()
 			optimizer.reset(commandBuffer: reset)
 			reset.commit()
-			
 			(0..<1024).forEach { (_) in
 				do {
 					let commandBuffer: MTLCommandBuffer = queue.makeCommandBuffer()
@@ -104,7 +103,7 @@ class OptimizerTests: XCTestCase {
 		optimizerTests(factory: Adam.factory(α: 1))
 	}
 	func testMomentum() {
-		optimizerTests(factory: Momentum.factory(η: 1e-3, γ: 0.9))
+		optimizerTests(factory: Momentum.factory(η: 1e-5, γ: 0.9))
 	}
 	func testSMORMS3() {
 		optimizerTests(factory: SMORMS3.factory(α: 1e-3, ε: 1e-12))

@@ -9,14 +9,14 @@
 import Metal
 
 public class AdaDelta {
-	let pipeline: MTLComputePipelineState
+	let optimizer: MTLComputePipelineState
 	let parameters: MTLBuffer
 	let groups: MTLSize
 	let threads: MTLSize
 	private init(pipeline state: MTLComputePipelineState, count: Int) {
 		groups = MTLSize(width: (count+15)/16, height: 1, depth: 1)
 		threads = MTLSize(width: 1, height: 1, depth: 1)
-		pipeline = state
+		optimizer = state
 		parameters = state.device.makeBuffer(length: 2*16*groups.width*MemoryLayout<Float>.size, options: .storageModePrivate)
 	}
 	public static func factory(ρ: Float = 0.95, ε: Float = 1e-6) -> (MTLDevice) throws -> (Int) -> Optimizer {
@@ -37,11 +37,13 @@ public class AdaDelta {
 extension AdaDelta: Optimizer {
 	public func optimize(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δ: MTLBuffer) {
 		
-		assert(16 * groups.width * MemoryLayout<Float>.size<=θ.length)
-		assert(16 * groups.width * MemoryLayout<Float>.size<=Δ.length)
-		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		encoder.setComputePipelineState(pipeline)
+		
+		assert( optimizer.device === encoder.device )
+		assert( optimizer.device === θ.device && 16 * groups.width * MemoryLayout<Float>.size <= θ.length )
+		assert( optimizer.device === Δ.device && 16 * groups.width * MemoryLayout<Float>.size <= Δ.length )
+		
+		encoder.setComputePipelineState(optimizer)
 		encoder.setBuffer(θ, offset: 0, at: 0)
 		encoder.setBuffer(parameters, offset: 0, at: 1)
 		encoder.setBuffer(Δ, offset: 0, at: 2)

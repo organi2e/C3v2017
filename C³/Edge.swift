@@ -6,7 +6,6 @@
 //
 //
 
-import LaObjet
 import CoreData
 import Computer
 import Distributor
@@ -18,13 +17,12 @@ extension Edge {
 	internal func collect_clear(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
 		input.collect_clear(ignore: ignore)
 		refresh(commandBuffer: commandBuffer)
-		output.distributor.shuffle(commandBuffer: commandBuffer, χ: χ, μ: μ, σ: σ, count: output.width*input.width)
 	}
-	internal func collect(commandBuffer: CommandBuffer, ignore: Set<Cell>) -> (χ: LaObjet, μ: LaObjet, σ: LaObjet) {
+	internal func collect(commandBuffer: CommandBuffer, ignore: Set<Cell>) -> (μ: Buffer, σ: Buffer) {
 		let distributor: Distributor = output.distributor
 		let rows: Int = output.width
 		let cols: Int = input.width
-		let state: LaObjet = input.collect(ignore: ignore)
+		let state: Buffer = input.collect(ignore: ignore)
 		return (χ: matrix_product(make(nocopy: χ.contents(), rows: rows, cols: cols), state),
 		        μ: matrix_product(distributor.μ(make(nocopy: μ.contents(), rows: rows, cols: cols)), distributor.μ(state)),
 		        σ: matrix_product(distributor.σ(make(nocopy: σ.contents(), rows: rows, cols: cols)), distributor.σ(state))
@@ -33,9 +31,7 @@ extension Edge {
 	internal func correct_clear(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
 		output.correct_clear(ignore: ignore)
 	}
-	internal func correct(commandBuffer: CommandBuffer, ignore: Set<Cell>) -> LaObjet {
-		let(Δμ, Δσ) = output.correct(ignore: ignore)
-		return Δμ
+	internal func correct(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
 	}
 	override func setup() {
 		super.setup()

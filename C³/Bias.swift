@@ -6,7 +6,6 @@
 //
 //
 
-import LaObjet
 import CoreData
 import Computer
 import Distributor
@@ -28,19 +27,20 @@ extension Bias {
 			)
 		})
 	}
-	internal func collect_clear(commandBuffer: MTLCommandBuffer) {
+	internal func collect_clear(commandBuffer: CommandBuffer) {
 		refresh(commandBuffer: commandBuffer)
-		cell.distributor.shuffle(commandBuffer: commandBuffer, χ: χ, μ: μ, σ: σ, count: cell.width)
 	}
-	internal func collect(commandBuffer: CommandBuffer, ignore: Set<Cell>) -> (χ: LaObjet, μ: LaObjet, σ: LaObjet) {
-		let distributor: Distributor = cell.distributor
-		let width: Int = cell.width
+	internal func collect(distributor: Distributor, ignore: Set<Cell>) {
+		
+		
+		
+		/*let width: Int = cell.width
 		return (χ: make(nocopy: χ.contents(), rows: width, cols: 1),
 		        μ: distributor.μ(make(nocopy: μ.contents(), rows: width, cols: 1)),
 		        σ: distributor.σ(make(nocopy: σ.contents(), rows: width, cols: 1))
 		)
+		*/
 	}
-	internal func collect(distributor: Distributor, )
 	internal func correct_clear(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
 		j.progress()
 		

@@ -9,15 +9,15 @@
 import Metal
 
 public class Momentum {
-	let pipeline: MTLComputePipelineState
+	let optimizer: MTLComputePipelineState
 	let parameters: MTLBuffer
 	let threads: MTLSize
 	let groups: MTLSize
 	private init(pipeline state: MTLComputePipelineState, count: Int) {
-		groups = MTLSize(width: (count+15)/16, height: 1, depth: 1)
+		groups = MTLSize(width: count, height: 1, depth: 1)
 		threads = MTLSize(width: 1, height: 1, depth: 1)
-		pipeline = state
-		parameters = state.device.makeBuffer(length: 16*groups.width*MemoryLayout<Float>.size, options: .storageModePrivate)
+		optimizer = state
+		parameters = state.device.makeBuffer(length: groups.width*MemoryLayout<Float>.size, options: .storageModePrivate)
 	}
 	public static func factory(η: Float = 1e-3, γ: Float = 0.9) -> (MTLDevice) throws -> (Int) -> Optimizer {
 		let bundle: Bundle = Bundle(for: self)
@@ -37,11 +37,13 @@ public class Momentum {
 extension Momentum: Optimizer {
 	public func optimize(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δ: MTLBuffer) {
 
-		assert(parameters.length<=θ.length)
-		assert(parameters.length<=Δ.length)
-		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		encoder.setComputePipelineState(pipeline)
+		
+		assert( optimizer.device === encoder.device )
+		assert( optimizer.device === θ.device && parameters.length <= θ.length )
+		assert( optimizer.device === Δ.device && parameters.length <= Δ.length )
+		
+		encoder.setComputePipelineState(optimizer)
 		encoder.setBuffer(θ, offset: 0, at: 0)
 		encoder.setBuffer(parameters, offset: 0, at: 1)
 		encoder.setBuffer(Δ, offset: 0, at: 2)
