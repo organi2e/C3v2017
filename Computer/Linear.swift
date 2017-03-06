@@ -14,16 +14,15 @@ extension Computer {
 		assert(MemoryLayout<Float>.size*count<=y.length && y.device === queue.device)
 		assert(MemoryLayout<Float>.size*count<=x.length && x.device === queue.device)
 		let commandBuffer: CommandBuffer = queue.makeCommandBuffer()
-		if true {
-			let encoder: ComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-			encoder.setComputePipelineState(pipelineState)
-			encoder.setBuffer(z, offset: 0, at: 0)
-			encoder.setBuffer(y, offset: 0, at: 1)
-			encoder.setBuffer(x, offset: 0, at: 2)
-			encoder.setBytes([uint(count-1)/16+1], length: MemoryLayout<uint>.size, at: 3)
-			encoder.dispatchThreadgroups(MTLSize(width: (count-1)/(threads.width*64)+1, height: 1, depth: 1), threadsPerThreadgroup: threads)
-			encoder.endEncoding()
-		}
+		let encoder: ComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		encoder.setComputePipelineState(pipelineState)
+		encoder.setBuffer(z, offset: 0, at: 0)
+		encoder.setBuffer(y, offset: 0, at: 1)
+		encoder.setBuffer(x, offset: 0, at: 2)
+		encoder.setBytes([uint(count)], length: MemoryLayout<uint>.size, at: 3)
+		encoder.dispatchThreadgroups(.init(width: count, height: 1, depth: 1),
+		                             threadsPerThreadgroup: .init(width: 1, height: 1, depth: 1))
+		encoder.endEncoding()
 		commandBuffer.commit()
 	}
 	public func add(z: Buffer, y: Buffer, x: Buffer, count: Int) {
@@ -33,14 +32,7 @@ extension Computer {
 		invoke(z: z, y: y, x: x, count: count, pipelineState: sub)
 	}
 	public func mul(commandBuffer: CommandBuffer, z: Buffer, y: Buffer, x: Buffer, count: Int) {
-		let encoder: ComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		encoder.setComputePipelineState(mul)
-		encoder.setBuffer(z, offset: 0, at: 0)
-		encoder.setBuffer(y, offset: 0, at: 1)
-		encoder.setBuffer(x, offset: 0, at: 2)
-		encoder.setBytes([uint(count-1)/16+1], length: MemoryLayout<uint>.size, at: 3)
-		encoder.dispatchThreadgroups(MTLSize(width: (count-1)/(threads.width*64)+1, height: 1, depth: 1), threadsPerThreadgroup: threads)
-		encoder.endEncoding()
+		invoke(z: z, y: y, x: x, count: count, pipelineState: mul)
 	}
 	public func div(z: Buffer, y: Buffer, x: Buffer, count: Int) {
 		invoke(z: z, y: y, x: x, count: count, pipelineState: div)

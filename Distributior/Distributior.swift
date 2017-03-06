@@ -20,7 +20,7 @@ import Metal
 import Accelerate
 import Metal
 public protocol Derivative {
-	func derivate(commandBuffer: MTLCommandBuffer, g: (μ: MTLBuffer, σ: MTLBuffer), j: (μ: MTLBuffer, σ: MTLBuffer), y: (Δ: MTLBuffer, p: MTLBuffer), v: (μ: MTLBuffer, σ: MTLBuffer), count: Int)
+	func derivate(commandBuffer: MTLCommandBuffer, Δ: (μ: MTLBuffer, σ: MTLBuffer), g: (μ: MTLBuffer, σ: MTLBuffer), y: (Δ: MTLBuffer, p: MTLBuffer), v: (μ: MTLBuffer, σ: MTLBuffer), count: Int)
 	
 	func delta(commandBuffer: MTLCommandBuffer, Δ: (μ: MTLBuffer, σ: MTLBuffer), j: (μ: MTLBuffer, σ: MTLBuffer), g: (μ: MTLBuffer, σ: MTLBuffer), count: (rows: Int, cols: Int), rtrl: Bool)
 	
@@ -29,8 +29,10 @@ public protocol Derivative {
 	func jacobian(commandBuffer: MTLCommandBuffer, Σ: (μ: MTLBuffer, σ: MTLBuffer), b: (μ: MTLBuffer, σ: MTLBuffer), g: (μ: MTLBuffer, σ: MTLBuffer), j: (μ: MTLBuffer, σ: MTLBuffer), y: MTLBuffer, count: (rows: Int, cols: Int), rtrl: Bool)
 	func jacobian(commandBuffer: MTLCommandBuffer, Σ: (μ: MTLBuffer, σ: MTLBuffer), c: (μ: MTLBuffer, σ: MTLBuffer), count: Int, rtrl: Bool)
 	func jacobian(commandBuffer: MTLCommandBuffer, Σ: (μ: MTLBuffer, σ: MTLBuffer), d: MTLBuffer, j: (μ: MTLBuffer, σ: MTLBuffer), count: (rows: Int, cols: Int), rtrl: Bool)
+	func jacobian(commandBuffer: MTLCommandBuffer, Σ: (μ: MTLBuffer, σ: MTLBuffer), x: MTLBuffer, a: (μ: MTLBuffer, σ: MTLBuffer), count: (rows: Int, cols: Int), rtrl: Bool)
 }
 public protocol Activative {
+	
 	func activate(commandBuffer: MTLCommandBuffer, y: (χ: MTLBuffer, p: MTLBuffer), v: (μ: MTLBuffer, σ: MTLBuffer), count: Int)
 	func collect(commandBuffer: MTLCommandBuffer, v: (μ: MTLBuffer, σ: MTLBuffer), Σ: (μ: MTLBuffer, σ: MTLBuffer), count: Int)
 	func collect(commandBuffer: MTLCommandBuffer, Σ: (μ: MTLBuffer, σ: MTLBuffer), w: (μ: MTLBuffer, σ: MTLBuffer), x: MTLBuffer, count: (rows: Int, cols: Int))

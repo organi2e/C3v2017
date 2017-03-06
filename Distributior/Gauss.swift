@@ -21,10 +21,11 @@ public class GaussDistributor {
 	let jacobianB: MTLComputePipelineState
 	let jacobianC: MTLComputePipelineState
 	let jacobianD: MTLComputePipelineState
+	let jacobianX: MTLComputePipelineState
 	let deltaJ: MTLComputePipelineState
 	let deltaG: MTLComputePipelineState
-	public init(device: MTLDevice,
-	            activateP: MTLComputePipelineState,
+	let deltaX: MTLComputePipelineState
+	public init(activateP: MTLComputePipelineState,
 	            derivateP: MTLComputePipelineState,
 	            collect: MTLComputePipelineState,
 	            collectW: MTLComputePipelineState,
@@ -35,8 +36,10 @@ public class GaussDistributor {
 	            jacobianB: MTLComputePipelineState,
 	            jacobianC: MTLComputePipelineState,
 	            jacobianD: MTLComputePipelineState,
+	            jacobianX: MTLComputePipelineState,
 	            deltaJ: MTLComputePipelineState,
-	            deltaG: MTLComputePipelineState) {
+	            deltaG: MTLComputePipelineState,
+	            deltaX: MTLComputePipelineState) {
 		self.activateP = activateP
 		self.derivateP = derivateP
 		self.collect = collect
@@ -48,8 +51,10 @@ public class GaussDistributor {
 		self.jacobianB = jacobianB
 		self.jacobianC = jacobianC
 		self.jacobianD = jacobianD
+		self.jacobianX = jacobianX
 		self.deltaJ = deltaJ
 		self.deltaG = deltaG
+		self.deltaX = deltaX
 	}
 	public static func factory() -> (MTLDevice) throws -> Distributor {
 		let bundle: Bundle = Bundle(for: self)
@@ -67,10 +72,11 @@ public class GaussDistributor {
 			let jacobianB: MTLComputePipelineState = try library.make(name: "GaussJacobianB")
 			let jacobianC: MTLComputePipelineState = try library.make(name: "GaussJacobianC")
 			let jacobianD: MTLComputePipelineState = try library.make(name: "GaussJacobianD")
+			let jacobianX: MTLComputePipelineState = try library.make(name: "GaussJacobianX")
 			let deltaJ: MTLComputePipelineState = try library.make(name: "GaussDeltaJ")
 			let deltaG: MTLComputePipelineState = try library.make(name: "GaussDeltaG")
-			return GaussDistributor(device: $0,
-			                        activateP: activateP,
+			let deltaX: MTLComputePipelineState = try library.make(name: "GaussDeltaX")
+			return GaussDistributor(activateP: activateP,
 			                        derivateP: derivateP,
 			                        collect: collect,
 			                        collectW: collectW,
@@ -81,8 +87,10 @@ public class GaussDistributor {
 			                        jacobianB: jacobianB,
 			                        jacobianC: jacobianC,
 			                        jacobianD: jacobianD,
+			                        jacobianX: jacobianX,
 			                        deltaJ: deltaJ,
-			                        deltaG: deltaG)
+			                        deltaG: deltaG,
+			                        deltaX: deltaX)
 		}
 	}
 }
@@ -210,17 +218,17 @@ extension GaussDistributor: Activative {
 }
 extension GaussDistributor: Derivative {
 	public func derivate(commandBuffer: MTLCommandBuffer,
+	                     Δ: (μ: MTLBuffer, σ: MTLBuffer),
 	                     g: (μ: MTLBuffer, σ: MTLBuffer),
-	                     j: (μ: MTLBuffer, σ: MTLBuffer),
 	                     y: (Δ: MTLBuffer, p: MTLBuffer),
 	                     v: (μ: MTLBuffer, σ: MTLBuffer), count: Int) {
 		
 		assert( derivateP.device === commandBuffer.device )
 		
+		assert( activateP.device === Δ.μ.device && count * MemoryLayout<Float>.size <= Δ.μ.length )
+		assert( activateP.device === Δ.σ.device && count * MemoryLayout<Float>.size <= Δ.σ.length )
 		assert( activateP.device === g.μ.device && count * MemoryLayout<Float>.size <= g.μ.length )
 		assert( activateP.device === g.σ.device && count * MemoryLayout<Float>.size <= g.σ.length )
-		assert( activateP.device === j.μ.device && count * MemoryLayout<Float>.size <= j.μ.length )
-		assert( activateP.device === j.σ.device && count * MemoryLayout<Float>.size <= j.σ.length )
 		assert( activateP.device === y.Δ.device && count * MemoryLayout<Float>.size <= y.Δ.length )
 		assert( activateP.device === y.p.device && count * MemoryLayout<Float>.size <= y.p.length )
 		assert( activateP.device === v.μ.device && count * MemoryLayout<Float>.size <= v.μ.length )
@@ -228,10 +236,10 @@ extension GaussDistributor: Derivative {
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
 		encoder.setComputePipelineState(derivateP)
-		encoder.setBuffer(g.μ, offset: 0, at: 0)
-		encoder.setBuffer(g.σ, offset: 0, at: 1)
-		encoder.setBuffer(j.μ, offset: 0, at: 2)
-		encoder.setBuffer(j.σ, offset: 0, at: 3)
+		encoder.setBuffer(Δ.μ, offset: 0, at: 0)
+		encoder.setBuffer(Δ.σ, offset: 0, at: 1)
+		encoder.setBuffer(g.μ, offset: 0, at: 2)
+		encoder.setBuffer(g.σ, offset: 0, at: 3)
 		encoder.setBuffer(y.Δ, offset: 0, at: 4)
 		encoder.setBuffer(y.p, offset: 0, at: 5)
 		encoder.setBuffer(v.μ, offset: 0, at: 6)
@@ -419,6 +427,7 @@ extension GaussDistributor: Derivative {
 		                             threadsPerThreadgroup: .init(width: 1, height: 1, depth: 1))
 		encoder.endEncoding()
 	}
+	//jd
 	public func jacobian(commandBuffer: MTLCommandBuffer,
 	                     Σ: (μ: MTLBuffer, σ: MTLBuffer),
 	                     d: MTLBuffer,
@@ -431,7 +440,7 @@ extension GaussDistributor: Derivative {
 		
 		assert( jacobianD.device === Σ.μ.device && rows * cols * MemoryLayout<Float>.size <= Σ.μ.length )
 		assert( jacobianD.device === Σ.σ.device && rows * cols * MemoryLayout<Float>.size <= Σ.σ.length )
-		assert( jacobianD.device === d.device && count.rows * MemoryLayout<Float>.size <= d.length )
+		assert( jacobianD.device === d.device && rows * MemoryLayout<Float>.size <= d.length )
 		assert( jacobianD.device === j.μ.device && rows * cols * MemoryLayout<Float>.size <= j.μ.length )
 		assert( jacobianD.device === j.σ.device && rows * cols * MemoryLayout<Float>.size <= j.σ.length )
 		
@@ -447,7 +456,37 @@ extension GaussDistributor: Derivative {
 		                             threadsPerThreadgroup: .init(width: 1, height: 1, depth: 1))
 		encoder.endEncoding()
 	}
-
+	//jx
+	public func jacobian(commandBuffer: MTLCommandBuffer,
+	                     Σ: (μ: MTLBuffer, σ: MTLBuffer),
+	                     x: MTLBuffer,
+	                     a: (μ: MTLBuffer, σ: MTLBuffer),
+	                     count: (rows: Int, cols: Int), rtrl: Bool = false) {
+		
+		let rows: Int = count.rows
+		let cols: Int = count.cols * ( rtrl ? count.rows : 1 )
+		
+		assert( jacobianX.device === commandBuffer.device )
+		
+		assert( jacobianX.device === Σ.μ.device && rows * cols * MemoryLayout<Float>.size <= Σ.μ.length )
+		assert( jacobianX.device === Σ.σ.device && rows * cols * MemoryLayout<Float>.size <= Σ.σ.length )
+		assert( jacobianX.device === x.device && cols * MemoryLayout<Float>.size <= x.length )
+		assert( jacobianX.device === a.μ.device && rows * cols * MemoryLayout<Float>.size <= a.μ.length )
+		assert( jacobianX.device === a.σ.device && rows * cols * MemoryLayout<Float>.size <= a.σ.length )
+		
+		
+		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		encoder.setComputePipelineState(jacobianX)
+		encoder.setBuffer(Σ.μ, offset: 0, at: 0)
+		encoder.setBuffer(Σ.σ, offset: 0, at: 1)
+		encoder.setBuffer(x, offset: 0, at: 2)
+		encoder.setBuffer(a.μ, offset: 0, at: 3)
+		encoder.setBuffer(a.σ, offset: 0, at: 4)
+		encoder.setBytes([uint(cols)], length: MemoryLayout<uint>.size, at: 5)
+		encoder.dispatchThreadgroups(.init(width: rows, height: cols, depth: 1),
+		                             threadsPerThreadgroup: .init(width: 1, height: 1, depth: 1))
+		encoder.endEncoding()
+	}
 }
 extension GaussDistributor: Distributor {
 	public func clear(commandBuffer: MTLCommandBuffer, μ: MTLBuffer, σ: MTLBuffer) {

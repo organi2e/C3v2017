@@ -18,12 +18,12 @@ public class Cell: ManagedObject {
 		case Target
 		case Adjust
 	}
-	internal var distributor: Distributor!
 	internal var ready: Set<Ready> = Set<Ready>()
 	internal var state: RingBuffer<(χ: Buffer, p: Buffer)> = RingBuffer<(χ: Buffer, p: Buffer)>()
 	internal var study: RingBuffer<(χ: Buffer, Δ: Buffer)> = RingBuffer<(χ: Buffer, Δ: Buffer)>()
 	internal var value: RingBuffer<(μ: Buffer, σ: Buffer)> = RingBuffer<(μ: Buffer, σ: Buffer)>()
 	internal var nabla: RingBuffer<(μ: Buffer, σ: Buffer)> = RingBuffer<(μ: Buffer, σ: Buffer)>()
+	internal var delta: RingBuffer<(μ: Buffer, σ: Buffer)> = RingBuffer<(μ: Buffer, σ: Buffer)>()
 }
 extension Cell {
 	internal func setup() {
@@ -45,6 +45,11 @@ extension Cell {
 			)}
 		)
 		nabla = RingBuffer<(μ: Buffer, σ: Buffer)>(array: array.map { (
+			context.make(length: length, options: .storageModePrivate),
+			context.make(length: length, options: .storageModePrivate)
+			)}
+		)
+		delta = RingBuffer<(μ: Buffer, σ: Buffer)>(array: array.map { (
 			context.make(length: length, options: .storageModePrivate),
 			context.make(length: length, options: .storageModePrivate)
 			)}
@@ -78,15 +83,23 @@ extension Cell {
 		commandBuffer.commit()
 		ready.remove(.Source)
 	}
-	public func collect(ignore: Set<Cell> = Set<Cell>()) -> Buffer {
-		guard !ignore.contains(self) else { return state.previous.χ }
+	public func collect(ignore: Set<Cell> = Set<Cell>()) -> (χ: Buffer, p: Buffer) {
+		guard !ignore.contains(self) else { return state.previous }
 		if !ready.contains(.Source) {
-			let commandBuffer: MTLCommandBuffer = context.make()
-			
-			commandBuffer.commit()
+			let distributor: Distributor = context.gaussFactory
+			input.forEach {
+				$0.collect(distributor: distributor, Σ: value.current, ignore: ignore.union([self]))
+			}
+			bias.collect(distributor: distributor, Σ: value.current, ignore: ignore.union([self]))
+			do {
+				let commandBuffer: MTLCommandBuffer = context.make()
+				distributor.collect(commandBuffer: commandBuffer, v: value.current, Σ: value.current, count: width)
+				distributor.activate(commandBuffer: commandBuffer, y: state.current, v: value.current, count: width)
+				commandBuffer.commit()
+			}
 			ready.insert(.Source)
 		}
-		return state.current.χ
+		return state.current
 	}
 	public func correct_clear(ignore: Set<Cell> = Set<Cell>()) {
 		let commandBuffer: CommandBuffer = context.make()
@@ -98,7 +111,7 @@ extension Cell {
 		nabla.progress()
 		do {
 			let encoder: BlitCommandEncoder = commandBuffer.makeBlitCommandEncoder()
-			[study.current.χ, study.current.Δ, nabla.current.μ, nabla.current.σ].forEach {
+			[study.current.χ, study.current.Δ, nabla.current.μ, nabla.current.σ, delta.current.μ, delta.current.σ].forEach {
 				encoder.fill(buffer: $0, range: NSRange(location: 0, length: $0.length), value: 0)
 			}
 			encoder.endEncoding()
@@ -107,18 +120,24 @@ extension Cell {
 		ready.remove(.Target)
 	}
 	public func correct(ignore: Set<Cell> = Set<Cell>()) -> (μ: Buffer, σ: Buffer) {
-		guard !ignore.contains(self) else { return (μ: nabla.previous.μ,
-		                                            σ: nabla.previous.σ
-			)
-		}
+		guard !ignore.contains(self) else { return delta.previous }
 		if !ready.contains(.Adjust) {
+			let distributor: Distributor = context.gaussFactory
 			if ready.contains(.Target) {
+				context.computer.sub(z: study.current.Δ, y: study.current.χ, x: state.current.χ, count: width)
+			} else {
+				
 			}
+			let commandBuffer: CommandBuffer = context.make()
+			distributor.derivate(commandBuffer: commandBuffer,
+			                     Δ: delta.current,
+			                     g: nabla.current,
+			                     y: (Δ: study.current.Δ, p: state.current.p),
+			                     v: value.current, count: width)
+			commandBuffer.commit()
 			ready.insert(.Adjust)
 		}
-		return (μ: nabla.current.μ,
-		        σ: nabla.current.σ
-		)
+		return delta.current
 	}
 }
 extension Cell {
@@ -181,16 +200,18 @@ extension Cell {
 extension Cell {
 	public var source: Array<Float> {
 		get {
-			let result: Array<Float> = Array<Float>(repeating: 0, count: width)
 			let source: Buffer = state.current.χ
+			let target: Buffer = context.make(length: width*MemoryLayout<Float>.size, options: .storageModeShared)
 			let commandBuffer: CommandBuffer = context.make()
+			let encoder: BlitCommandEncoder = commandBuffer.makeBlitCommandEncoder()
+			encoder.copy(from: source, sourceOffset: 0, to: target, destinationOffset: 0, size: min(source.length, target.length))
+			encoder.endEncoding()
 			commandBuffer.addCompletedHandler { ( _: CommandBuffer) in
-				assert(MemoryLayout<Float>.size*result.count==Data(bytesNoCopy: source.contents(), count: source.length, deallocator: .none)
-					.copyBytes(to: UnsafeMutableBufferPointer<Float>(start: UnsafeMutablePointer<Float>(mutating: result), count: result.count)))
+				target.setPurgeableState(.empty)
 			}
 			commandBuffer.commit()
 			commandBuffer.waitUntilCompleted()
-			return result
+			return Array<Float>(target.buffer)
 		}
 		set {
 			let commandBuffer: CommandBuffer = context.make()
@@ -239,7 +260,7 @@ extension Context {
 		assert(0<width)
 		let cell: Cell = try make()
 		cell.name = name
-		cell.width = width - ( width + 15 ) % 16 + 15
+		cell.width = width
 		cell.attributes = Dictionary<String, String>()
 		cell.date = Date()
 		try input.forEach {

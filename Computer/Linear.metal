@@ -6,83 +6,42 @@
 //
 //
 
-#include <metal_stdlib>
+#include<metal_stdlib>
 using namespace metal;
 inline float4x4 sq(float4x4 x);
-kernel void add(device float4x4 * const z [[ buffer(0) ]],
-				device float4x4 const * const y [[ buffer(1) ]],
-				device float4x4 const * const x [[ buffer(2) ]],
+kernel void add(device float * const z [[ buffer(0) ]],
+				device float const * const y [[ buffer(1) ]],
+				device float const * const x [[ buffer(2) ]],
 				constant uint const & length [[ buffer(3) ]],
 				uint n [[ thread_position_in_grid ]]) {
-	int4 const ofs = int4(0, 1, 2, 3);
-	int4 const idx = 4 * n + ofs;
-	bool4 const can = idx < length;
-	float4x4 const yx = y[idx.x];
-	float4x4 const yy = y[idx.y];
-	float4x4 const yz = y[idx.z];
-	float4x4 const yw = y[idx.w];
-	float4x4 const xx = x[idx.x];
-	float4x4 const xy = x[idx.y];
-	float4x4 const xz = x[idx.z];
-	float4x4 const xw = x[idx.w];
-	if ( can.x ) z[idx.x] = yx + xx;
-	if ( can.y ) z[idx.y] = yy + xy;
-	if ( can.z ) z[idx.z] = yz + xz;
-	if ( can.w ) z[idx.w] = yw + xw;
-}
-kernel void sub(device float4x4 * const z [[ buffer(0) ]],
-				device float4x4 const * const y [[ buffer(1) ]],
-				device float4x4 const * const x [[ buffer(2) ]],
-				constant uint const & length [[ buffer(3) ]],
-				uint n [[ thread_position_in_grid ]]) {
-	int4 const ofs = int4(0, 1, 2, 3);
-	int4 const idx = 4 * n + ofs;
-	bool4 const can = idx < length;
-	float4x4 const yx = y[idx.x];
-	float4x4 const yy = y[idx.y];
-	float4x4 const yz = y[idx.z];
-	float4x4 const yw = y[idx.w];
-	float4x4 const xx = x[idx.x];
-	float4x4 const xy = x[idx.y];
-	float4x4 const xz = x[idx.z];
-	float4x4 const xw = x[idx.w];
-	if ( can.x ) z[idx.x] = yx - xx;
-	if ( can.y ) z[idx.y] = yy - xy;
-	if ( can.z ) z[idx.z] = yz - xz;
-	if ( can.w ) z[idx.w] = yw - xw;
-}
-kernel void mul(device float4x4 * const z [[ buffer(0) ]],
-				device float4x4 const * const y [[ buffer(1) ]],
-				device float4x4 const * const x [[ buffer(2) ]],
-				uint const n [[ thread_position_in_grid ]]) {
 	int const idx = n;
-	float4x4 const yv = y[idx];
-	float4x4 const xv = x[idx];
-	z[idx] = float4x4(xv[0]*yv[0],
-					  xv[1]*yv[1],
-					  xv[2]*yv[2],
-					  xv[3]*yv[3]);
+	z[idx] = y[idx] + x[idx];
 }
-kernel void div(device float4x4 * const z [[ buffer(0) ]],
-				device float4x4 const * const y [[ buffer(1) ]],
-				device float4x4 const * const x [[ buffer(2) ]],
+kernel void sub(device float * const z [[ buffer(0) ]],
+				device float const * const y [[ buffer(1) ]],
+				device float const * const x [[ buffer(2) ]],
 				constant uint const & length [[ buffer(3) ]],
 				uint n [[ thread_position_in_grid ]]) {
-	int4 const ofs = int4(0, 1, 2, 3);
-	int4 const idx = 4 * n + ofs;
-	bool4 const can = idx < length;
-	float4x4 const yx = y[idx.x];
-	float4x4 const yy = y[idx.y];
-	float4x4 const yz = y[idx.z];
-	float4x4 const yw = y[idx.w];
-	float4x4 const xx = x[idx.x];
-	float4x4 const xy = x[idx.y];
-	float4x4 const xz = x[idx.z];
-	float4x4 const xw = x[idx.w];
-	if ( can.x ) z[idx.x] = float4x4(yx[0]/xx[0], yy[1]/xy[1], yz[2]/xz[2], yw[3]/xw[3]);
-	if ( can.y ) z[idx.y] = float4x4(yx[0]/xx[0], yy[1]/xy[1], yz[2]/xz[2], yw[3]/xw[3]);
-	if ( can.z ) z[idx.z] = float4x4(yx[0]/xx[0], yy[1]/xy[1], yz[2]/xz[2], yw[3]/xw[3]);
-	if ( can.w ) z[idx.w] = float4x4(yx[0]/xx[0], yy[1]/xy[1], yz[2]/xz[2], yw[3]/xw[3]);
+	int const idx = n;
+	z[idx] = y[idx] - x[idx];
+}
+
+kernel void mul(device float * const z [[ buffer(0) ]],
+				device float const * const y [[ buffer(1) ]],
+				device float const * const x [[ buffer(2) ]],
+				constant uint const & length [[ buffer(3) ]],
+				uint n [[ thread_position_in_grid ]]) {
+	int const idx = n;
+	z[idx] = y[idx] * x[idx];
+}
+
+kernel void div(device float * const z [[ buffer(0) ]],
+				device float const * const y [[ buffer(1) ]],
+				device float const * const x [[ buffer(2) ]],
+				constant uint const & length [[ buffer(3) ]],
+				uint n [[ thread_position_in_grid ]]) {
+	int const idx = n;
+	z[idx] = y[idx] / x[idx];
 }
 kernel void gemm(device float * const C [[ buffer(0) ]],
 				 device float const * const A [[ buffer(1) ]],

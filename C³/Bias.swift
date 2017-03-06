@@ -11,7 +11,7 @@ import Computer
 import Distributor
 
 internal class Bias: Arcane {
-	var j: RingBuffer<(μ: Buffer, σ: Buffer)> = RingBuffer<(μ: Buffer, σ: Buffer)>()
+	fileprivate var j: RingBuffer<(μ: Buffer, σ: Buffer)> = RingBuffer<(μ: Buffer, σ: Buffer)>()
 }
 extension Bias {
 	@NSManaged var cell: Cell
@@ -19,9 +19,8 @@ extension Bias {
 extension Bias {
 	override func setup() {
 		let length: Int = cell.width * cell.width * MemoryLayout<Float>.size
-		let array: Array<Void> = Array<Void>(repeating: (), count: 2)
 		super.setup()
-		j = RingBuffer<(μ: Buffer, σ: Buffer)>(array: array.map {(
+		j = RingBuffer<(μ: Buffer, σ: Buffer)>(array: Array<Void>(repeating: (), count: 2).map {(
 			context.make(length: length),
 			context.make(length: length)
 			)
@@ -30,36 +29,26 @@ extension Bias {
 	internal func collect_clear(commandBuffer: CommandBuffer) {
 		refresh(commandBuffer: commandBuffer)
 	}
-	internal func collect(distributor: Distributor, ignore: Set<Cell>) {
-		
-		
-		
-		/*let width: Int = cell.width
-		return (χ: make(nocopy: χ.contents(), rows: width, cols: 1),
-		        μ: distributor.μ(make(nocopy: μ.contents(), rows: width, cols: 1)),
-		        σ: distributor.σ(make(nocopy: σ.contents(), rows: width, cols: 1))
-		)
-		*/
+	internal func collect(distributor: Distributor, Σ: (μ: Buffer, σ: Buffer), ignore: Set<Cell>) {
+		let count: Int = cell.width
+		let c: (μ: Buffer, σ: Buffer) = (μ: μ, σ: σ)
+		let commandBuffer: CommandBuffer = context.make()
+		distributor.collect(commandBuffer: commandBuffer, Σ: Σ, c: c, count: count)
+		distributor.jacobian(commandBuffer: commandBuffer, Σ: j.current, c: c, count: count, rtrl: false)
+		commandBuffer.commit()
 	}
 	internal func correct_clear(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
 		j.progress()
-		
+		do {
+			let encoder: BlitCommandEncoder = commandBuffer.makeBlitCommandEncoder()
+			[j.current.μ, j.current.σ].forEach {
+				encoder.fill(buffer: $0, range: NSRange(location: 0, length: $0.length), value: 0)
+			}
+			encoder.endEncoding()
+		}
+		commandBuffer.commit()
 	}
 	internal func correct(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
-		let width: Int = cell.width
-		let Δ: (μ: LaObjet, σ: LaObjet) = cell.correct(ignore: ignore)
-		
-		do {
-			let jμ: LaObjet = make(nocopy: j.current.μ.contents(), rows: width, cols: width)
-			let jσ: LaObjet = make(nocopy: j.current.σ.contents(), rows: width, cols: width)
-			func block(_: CommandBuffer) {
-				matrix_product(Δ.μ, jμ).render(to: Δμ.contents())
-				matrix_product(Δ.σ, jσ).render(to: Δσ.contents())
-			}
-			let commandBuffer: CommandBuffer = context.make()
-			commandBuffer.addCompletedHandler(block)
-			commandBuffer.commit()
-		}
 		
 	}
 }

@@ -12,7 +12,7 @@ import Metal
 import Computer
 
 class ComputerTests: XCTestCase {
-	let N: Int = 1024 * 1024
+	let N: Int = 1024
 	let K: Int = 1024
 	func testGPU() {
 		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { XCTFail(); return }

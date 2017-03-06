@@ -7,6 +7,7 @@
 //
 
 #include <metal_stdlib>
+#include <metal_math>
 using namespace metal;
 
 inline float4x4 BoxMuller(float4x4,float4x4,float4x4);
@@ -24,7 +25,7 @@ template<typename T> T sq(T x) {
 	return x * x;
 }
 template<typename T> T erf(T z) {
-	T const v = 1.0 / fma(0.5, fabs(z), 1.0);
+	T const v = 1.0 / fma(fabs(z), 0.5, 1.0);
 	//	T const e = 1.0-v*exp(-z*z-1.26551223+v*(1.00002368+v*(0.37409196+v*(0.09678418+v*(-0.18628806+v*(0.27886807+v*(-1.13520398+v*(1.48851587+v*(-0.82215223+v*(0.17087277))))))))));
 	return copysign(fma(-v,
 						exp(fma(v,
@@ -172,8 +173,8 @@ kernel void GaussCollectD(device float * const su [[ buffer(0) ]],
 constant float const M_SQRT1_2PI_F = 0.5 * M_2_SQRTPI_F * M_SQRT1_2_F;
 kernel void GaussDerivateP(device float * const dU [[ buffer(0) ]],
 						   device float * const dS [[ buffer(1) ]],
-						   device float * const jU [[ buffer(2) ]],
-						   device float * const jS [[ buffer(3) ]],
+						   device float * const gU [[ buffer(2) ]],
+						   device float * const gS [[ buffer(3) ]],
 						   device float const * const D [[ buffer(4) ]],
 						   device float const * const P [[ buffer(5) ]],
 						   device float const * const U [[ buffer(6) ]],
@@ -186,11 +187,11 @@ kernel void GaussDerivateP(device float * const dU [[ buffer(0) ]],
 	float const x = u / s;
 	//float const p = P[idx];
 	float const d = D[idx];// * select(1.0, p * ( 1.0 - p ), 0.0 < p && p < 1.0);
-	float const j = M_SQRT1_2PI_F * exp( -0.5 * x * x );
-	float const ju = j / s;
-	float const js = ju * -x;
-	dU[idx] = d * (jU[idx] = ju);
-	dS[idx] = d * (jS[idx] = js);
+	float const g = M_SQRT1_2PI_F * exp( -0.5 * x * x );
+	float const gu = g / s;
+	float const gs = gu * -x;
+	dU[idx] = d * (gU[idx] = gu);
+	dS[idx] = d * (gS[idx] = gs);
 }
 kernel void GaussJacobian(device float * const ju [[ buffer(0) ]],
 						  device float * const js [[ buffer(1) ]],
@@ -208,8 +209,8 @@ kernel void GaussJacobian(device float * const ju [[ buffer(0) ]],
 }
 kernel void GaussJacobianA(device float * const ju [[ buffer(0) ]],
 						   device float * const js [[ buffer(1) ]],
-						   device float const * const u [[ buffer(2) ]],
-						   device float const * const s [[ buffer(3) ]],
+						   device float const * const au [[ buffer(2) ]],
+						   device float const * const as [[ buffer(3) ]],
 						   device float const * const x [[ buffer(4) ]],
 						   constant uint2 & ld [[ buffer(5) ]],
 						   uint2 const ij [[ thread_position_in_grid ]]) {
@@ -217,7 +218,7 @@ kernel void GaussJacobianA(device float * const ju [[ buffer(0) ]],
 	int const cols = ij.y;
 	int const idx = cols + ld.y * rows * ld.x;
 	float const xv = x [ cols ];
-	float const sv = s [ cols + ld.y * rows ];
+	float const sv = as [ cols + ld.y * rows ];
 	ju [ idx ] += xv;
 	js [ idx ] += xv * xv * sv;
 }
@@ -317,6 +318,21 @@ kernel void GaussJacobianD(device float * const ju [[ buffer(0) ]],
 	ju[idx] +=    r*pu[idx];
 	js[idx] += sq(r*ps[idx]);
 }
+kernel void GaussJacobianX(device float * const ju [[ buffer(0) ]],
+						   device float * const js [[ buffer(1) ]],
+						   device float const * const x [[ buffer(2) ]],
+						   device float const * const wu [[ buffer(3) ]],
+						   device float const * const ws [[ buffer(4) ]],
+						   constant uint & ld [[ buffer(5) ]],
+						   uint2 const ij [[ thread_position_in_grid ]]) {
+	int const rows = ij.x;
+	int const cols = ij.y;
+	int const idx = rows * ld + cols;
+	float const u = wu[idx];
+	float const s = ws[idx];
+	ju[idx] += u;
+	js[idx] += s * s * x[cols];
+}
 kernel void GaussDeltaW(device float * const du [[ buffer(0) ]],
 						device float * const ds [[ buffer(1) ]],
 						device float const * const wu [[ buffer(2) ]],
@@ -351,7 +367,7 @@ kernel void GaussDeltaC(device float * const du [[ buffer(0) ]],
 /*
  sugar function to compute Δx <- Δμ(y), Δσ(y), μ(v), σ(v), μ(w), σ(w), x  
  */
-kernel void GaussDeltaX(device float * const dx [[ buffer(0) ]],
+kernel void GaussDeltaS(device float * const dx [[ buffer(0) ]],
 						device float const * const x [[ buffer(1) ]],
 						device float const * const wu [[ buffer(2) ]],
 						device float const * const ws [[ buffer(3) ]],
@@ -498,6 +514,69 @@ kernel void GaussDeltaJ(device float * const du [[ buffer(0) ]],
 	} else if ( rows_mask.x ) {
 		*(device float *)(du+row.x) += accum_u->x;
 		*(device float *)(ds+row.x) += accum_s->x;
+	}
+}
+kernel void GaussDeltaX(device float * const dx [[ buffer(0) ]],
+						device float const * const ju [[ buffer(1) ]],
+						device float const * const js [[ buffer(2) ]],
+						device float const * const dydu [[ buffer(3) ]],
+						device float const * const dyds [[ buffer(4) ]],
+						constant uint2 & S [[ buffer(5) ]],
+						threadgroup float4 * shared [[ threadgroup(0) ]],
+						uint const t [[ thread_position_in_threadgroup ]],
+						uint const T [[ threads_per_threadgroup ]],
+						uint const n [[ threadgroup_position_in_grid ]]) {
+	
+	int2 const size = int2(S);
+	
+	float4 x = 0;
+	
+	int4 const row = 4 * n + int4(0, 1, 2, 3);
+	bool4 const rows_mask = row < size.x;
+	
+	for ( int k = 4 * t, K = size.y ; k < K ; k += 4 * T ) {
+		
+		int4 const col = k + int4(0, 1, 2, 3);
+		bool4 const cols_mask = col < size.y;
+		
+		int4 const idx = col * size.x + row.x;
+		
+		x +=
+		float4x4(select(0, *(device float4*)(ju + idx.x), rows_mask && cols_mask.x),
+				 select(0, *(device float4*)(ju + idx.y), rows_mask && cols_mask.y),
+				 select(0, *(device float4*)(ju + idx.z), rows_mask && cols_mask.z),
+				 select(0, *(device float4*)(ju + idx.w), rows_mask && cols_mask.w)) * select(0, *(device float4*)(dydu + k), cols_mask);
+		
+		x +=
+		float4x4(select(0, *(device float4*)(js + idx.x), rows_mask && cols_mask.x),
+				 select(0, *(device float4*)(js + idx.y), rows_mask && cols_mask.y),
+				 select(0, *(device float4*)(js + idx.z), rows_mask && cols_mask.z),
+				 select(0, *(device float4*)(js + idx.w), rows_mask && cols_mask.w)) * select(0, *(device float4*)(dyds + k), cols_mask);
+	}
+	
+	int const a = t;
+	int b = T;
+	
+	threadgroup float4 * accum = shared + a;
+	
+	*accum = x;
+	
+	while ( b >>= 1 ) {
+		threadgroup_barrier( mem_flags :: mem_threadgroup );
+		if ( a < b ) {
+			*accum += accum[b];
+		}
+	}
+	if ( a ) {
+		
+	} else if ( rows_mask.w ) {
+		*(device float4*)(dx+row.x) += accum->xyzw;
+	} else if ( rows_mask.z ) {
+		*(device float3*)(dx+row.x) += accum->xyz;
+	} else if ( rows_mask.y ) {
+		*(device float2*)(dx+row.x) += accum->xy;
+	} else if ( rows_mask.x ) {
+		*(device float *)(dx+row.x) += accum->x;
 	}
 }
 kernel void GaussJacobianMuA(device float * const G [[ buffer(0) ]],
