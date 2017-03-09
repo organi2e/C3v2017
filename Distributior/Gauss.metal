@@ -198,9 +198,10 @@ kernel void GaussDerivateP(device float * const dU [[ buffer(0) ]],
 		float const u = U[idx];
 		float const s = S[idx];
 		float const x = u / s;
-		float const p = fma(erf(M_SQRT1_2_F*x), 0.5, 0.5);
-		float const d = D[idx] / select(1.0, p * ( 1.0 - p ), 0.0 < p && p < 1.0);
-		float const g = M_SQRT1_2PI_F * exp( -0.5 * x * x );
+		float const e = erf(M_SQRT1_2_F*x);
+		float const r = -4 / fma(e, e, -1);
+		float const d = sign(D[idx]) * select(1.0, r, isnormal(r));//Avoid infinite,
+		float const g = M_SQRT1_2PI_F * exp(-0.5 * x * x );
 		float const gu = g / s;
 		float const gs = gu * -x;
 		dU[idx] = d * (gU[idx] = gu);

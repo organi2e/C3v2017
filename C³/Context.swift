@@ -11,6 +11,7 @@ import Math
 import CoreData
 import Distributor
 import Optimizer
+import Adapter
 
 internal typealias Device = MTLDevice
 internal typealias ResourceOptions = MTLResourceOptions
@@ -26,6 +27,8 @@ public class Context: NSManagedObjectContext {
 	let math: Math
 	let gaussFactory: Distributor
 	let optimizerFactory: (Int) -> Optimizer
+	let lassoFactory: (Int) -> Adapter
+	let expFactory: (Int) -> Adapter
 	enum ErrorCase: Error, CustomStringConvertible {
 		case InvalidContext
 		case InvalidEntity(name: String)
@@ -53,6 +56,8 @@ public class Context: NSManagedObjectContext {
 		math = try Math(device: device)
 		gaussFactory = try GaussDistributor.factory()(device)
 		optimizerFactory = try optimizer(device)
+		lassoFactory = try Lasso.factory(λ: 0)(device)
+		expFactory = try Exponential.factory()(device)
 		super.init(concurrencyType: concurrencyType)
 		guard let model: NSManagedObjectModel = NSManagedObjectModel.mergedModel(from: [Bundle(for: type(of: self))]) else { throw ErrorCase.NoModelFound }
 		let store: NSPersistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
@@ -67,6 +72,8 @@ public class Context: NSManagedObjectContext {
 		math = try!Math(device: device)
 		gaussFactory = try!GaussDistributor.factory()(device)
 		optimizerFactory = try!SGD.factory()(device)
+		lassoFactory = try!Lasso.factory(λ: 0)(device)
+		expFactory = try!Exponential.factory()(device)
 		super.init(coder: aDecoder)
 		fatalError()
 	}

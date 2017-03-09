@@ -120,7 +120,7 @@ extension Cell {
 			let commandBuffer: CommandBuffer = context.make()
 			let distributor: Distributor = context.gaussFactory
 			if ready.contains(.Target) {
-				context.math.sub(commandBuffer: commandBuffer, y: study.current, a: study.current, b: state.current, count: width)
+				context.math.sub(commandBuffer: commandBuffer, y: study.current, a: state.current, b: study.current, count: width)
 			} else {
 				output.forEach {
 					$0.correct(distributor: distributor, Σ: study.current, ignore: ignore.union([self]))
@@ -197,7 +197,7 @@ extension Cell {
 extension Cell {
 	public var source: Array<Float> {
 		get {
-			let source: Buffer = state.current
+			let source: Buffer = ratio.current
 			let target: Buffer = context.make(length: width*MemoryLayout<Float>.size, options: .storageModeShared)
 			let commandBuffer: CommandBuffer = context.make()
 			context.math.copy(commandBuffer: commandBuffer, target: (target, 0), source: (source, 0), count: min(source.length, target.length))

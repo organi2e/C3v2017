@@ -18,6 +18,6 @@ kernel void StochasticGradientDescentOptimize(device float * const value [[ buff
 											  uint const n [[ thread_position_in_grid ]]) {
 	if ( n < N ) {
 		int const idx = n;
-		value[idx] += eta * delta[idx];
+		value[idx] -= eta * delta[idx];
 	}
 }

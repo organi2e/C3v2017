@@ -35,7 +35,7 @@ kernel void SMORMS3Optimize(device float * const theta [[ buffer(0) ]],
 		p.x = fma(p.x, 1 - v, 1);
 		
 		//update
-		theta[idx] += alpha * v * t * g;//or min(alpha, v)
+		theta[idx] -= alpha * v * t * g;//or min(alpha, v)
 		parameters[idx] = p;
 		
 	}

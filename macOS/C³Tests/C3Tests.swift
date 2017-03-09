@@ -104,7 +104,7 @@ class C3Tests: XCTestCase {
 			let H: Cell = try context.make(name: "H", width:128, input: [I])
 			//let G: Cell = try context.make(name: "G", width:128, input: [H])
 			let O: Cell = try context.make(name: "O", width: 4, input: [H])
-			for k in 0..<800 {
+			for k in 0..<4000 {
 				
 				O.collect_clear()
 				I.correct_clear()
@@ -125,7 +125,7 @@ class C3Tests: XCTestCase {
 				I.source = IS[k]
 				O.target = OS[k]
 				O.collect()
-				print(O.target, O.source)
+				print(O.target, O.source, Array(O.value.current.μ.buffer), Array(O.value.current.σ.buffer))
 			}
 			
 		} catch {
