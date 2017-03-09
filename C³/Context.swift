@@ -7,16 +7,26 @@
 //
 
 import Metal
+import Math
 import CoreData
-import Computer
 import Distributor
 import Optimizer
 
+internal typealias Device = MTLDevice
+internal typealias ResourceOptions = MTLResourceOptions
+internal typealias CommandQueue = MTLCommandQueue
+internal typealias CommandBuffer = MTLCommandBuffer
+internal typealias Buffer = MTLBuffer
+internal typealias ManagedObject = NSManagedObject
+
 public class Context: NSManagedObjectContext {
-	let computer: Computer
+	var layout: ResourceOptions?
+	let device: Device
+	let queue: CommandQueue
+	let math: Math
 	let gaussFactory: Distributor
 	let optimizerFactory: (Int) -> Optimizer
-	enum ErrorCases: Error, CustomStringConvertible {
+	enum ErrorCase: Error, CustomStringConvertible {
 		case InvalidContext
 		case InvalidEntity(name: String)
 		case NoModelFound
@@ -34,24 +44,31 @@ public class Context: NSManagedObjectContext {
 			}
 		}
 	}
-	public init(storage: URL? = nil, device: MTLDevice? = nil, concurrencyType: NSManagedObjectContextConcurrencyType = .privateQueueConcurrencyType) throws {
-		guard let device: MTLDevice = device ?? MTLCreateSystemDefaultDevice() else { throw ErrorCases.NoDeviceFound }
-		computer = try Computer(device: device)
+	public init(storage: URL? = nil,
+	            optimizer: (MTLDevice) throws -> (Int) -> Optimizer = SGD.factory(η: 1e-3),
+	            concurrencyType: NSManagedObjectContextConcurrencyType = .privateQueueConcurrencyType) throws {
+		guard let mtl: Device = MTLCreateSystemDefaultDevice() else { throw ErrorCase.NoDeviceFound }
+		device = mtl
+		queue = device.makeCommandQueue()
+		math = try Math(device: device)
 		gaussFactory = try GaussDistributor.factory()(device)
-		optimizerFactory = try SMORMS3.factory()(device)
+		optimizerFactory = try optimizer(device)
 		super.init(concurrencyType: concurrencyType)
-		guard let model: NSManagedObjectModel = NSManagedObjectModel.mergedModel(from: [Bundle(for: type(of: self))]) else { throw ErrorCases.NoModelFound }
+		guard let model: NSManagedObjectModel = NSManagedObjectModel.mergedModel(from: [Bundle(for: type(of: self))]) else { throw ErrorCase.NoModelFound }
 		let store: NSPersistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
 		let type: String = storage?.pathExtension == "sqlite" ? NSSQLiteStoreType : storage != nil ? NSBinaryStoreType : NSInMemoryStoreType
 		try store.addPersistentStore(ofType: type, configurationName: nil, at: storage, options: nil)
 		persistentStoreCoordinator = store
 	}
 	public required init?(coder aDecoder: NSCoder) {
-		guard let device: MTLDevice = MTLCreateSystemDefaultDevice() else { fatalError(ErrorCases.NoDeviceFound.description) }
-		computer = try!Computer(device: device)
+		guard let mtl: Device = MTLCreateSystemDefaultDevice() else { fatalError(ErrorCase.NoDeviceFound.description) }
+		device = mtl
+		queue = device.makeCommandQueue()
+		math = try!Math(device: device)
 		gaussFactory = try!GaussDistributor.factory()(device)
-		optimizerFactory = try!SMORMS3.factory()(device)
+		optimizerFactory = try!SGD.factory()(device)
 		super.init(coder: aDecoder)
+		fatalError()
 	}
 	public override func encode(with aCoder: NSCoder) {
 		super.encode(with: aCoder)
@@ -64,27 +81,31 @@ extension Context {
 		return optimizerFactory(count)
 	}
 	internal func make() -> CommandBuffer {
-		return computer.make()
+		return queue.makeCommandBuffer()
 	}
 	internal func make<T>(array: Array<T>, options: ResourceOptions = []) -> Buffer {
-		return computer.make(array: array, options: options)
+		return device.makeBuffer(bytes: array, length: array.count*MemoryLayout<T>.size, options: layout ?? options)
 	}
 	internal func make(data: Data, options: ResourceOptions = []) -> Buffer {
-		return computer.make(data: data, options: options)
+		return device.makeBuffer(bytes: (data as NSData).bytes, length: data.count, options: layout ?? options)
 	}
 	internal func make(length: Int, options: ResourceOptions = []) -> Buffer {
-		return computer.make(length: length, options: options)
+		return device.makeBuffer(length: length, options: layout ?? options)
 	}
-	internal func make<T: NSManagedObject>() throws -> T {
+	internal func make<T: ManagedObject>() throws -> T {
 		let name: String = String(describing: T.self)
-		guard let entity: T = NSEntityDescription.insertNewObject(forEntityName: name, into: self)as?T else { throw ErrorCases.InvalidEntity(name: name) }
+		guard let entity: T = NSEntityDescription.insertNewObject(forEntityName: name, into: self)as?T else { throw ErrorCase.InvalidEntity(name: name) }
 		return entity
 	}
+	internal func sync() {
+		let commandBuffer: CommandBuffer = make()
+		commandBuffer.commit()
+		commandBuffer.waitUntilCompleted()
+	}
 }
-public typealias ManagedObject = NSManagedObject
-extension ManagedObject {
+extension NSManagedObject {
 	internal var context: Context {
-		guard let context: Context = managedObjectContext as? Context else { fatalError(Context.ErrorCases.InvalidContext.description) }
+		guard let context: Context = managedObjectContext as? Context else { fatalError(Context.ErrorCase.InvalidContext.description) }
 		return context
 	}
 }

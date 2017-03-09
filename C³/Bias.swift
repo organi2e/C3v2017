@@ -7,11 +7,10 @@
 //
 
 import CoreData
-import Computer
 import Distributor
 
 internal class Bias: Arcane {
-	fileprivate var j: RingBuffer<(μ: Buffer, σ: Buffer)> = RingBuffer<(μ: Buffer, σ: Buffer)>()
+	var j: RingBuffer<(μ: Buffer, σ: Buffer)> = RingBuffer<(μ: Buffer, σ: Buffer)>()
 }
 extension Bias {
 	@NSManaged var cell: Cell
@@ -21,8 +20,8 @@ extension Bias {
 		let length: Int = cell.width * cell.width * MemoryLayout<Float>.size
 		super.setup()
 		j = RingBuffer<(μ: Buffer, σ: Buffer)>(array: Array<Void>(repeating: (), count: 2).map {(
-			context.make(length: length),
-			context.make(length: length)
+			context.make(length: length, options: .storageModePrivate),
+			context.make(length: length, options: .storageModePrivate)
 			)
 		})
 	}
@@ -31,24 +30,25 @@ extension Bias {
 	}
 	internal func collect(distributor: Distributor, Σ: (μ: Buffer, σ: Buffer), ignore: Set<Cell>) {
 		let count: Int = cell.width
-		let c: (μ: Buffer, σ: Buffer) = (μ: μ, σ: σ)
 		let commandBuffer: CommandBuffer = context.make()
-		distributor.collect(commandBuffer: commandBuffer, Σ: Σ, c: c, count: count)
-		distributor.jacobian(commandBuffer: commandBuffer, Σ: j.current, c: c, count: count, rtrl: false)
+		distributor.collect(commandBuffer: commandBuffer, Σ: Σ, c: χ, count: count)
+		distributor.jacobian(commandBuffer: commandBuffer, Σ: j.current, c: χ, count: count, rtrl: false)
 		commandBuffer.commit()
 	}
 	internal func correct_clear(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
 		j.progress()
-		do {
-			let encoder: BlitCommandEncoder = commandBuffer.makeBlitCommandEncoder()
-			[j.current.μ, j.current.σ].forEach {
-				encoder.fill(buffer: $0, range: NSRange(location: 0, length: $0.length), value: 0)
-			}
-			encoder.endEncoding()
+		[j.current.μ, j.current.σ].forEach {
+			context.math.fill(commandBuffer: commandBuffer, target: ($0, 0), value: 0, count: $0.length)
 		}
-		commandBuffer.commit()
 	}
-	internal func correct(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
+	internal func correct(distributor: Distributor, ignore: Set<Cell>) {
+		let count: (rows: Int, cols: Int) = (rows: cell.width, cols: 1)
+		let (g, v): ((μ: Buffer, σ: Buffer), (μ: Buffer, σ: Buffer)) = cell.correct(ignore: ignore)
+		let commandBuffer: CommandBuffer = context.make()
+		distributor.jacobian(commandBuffer: commandBuffer, j: j.current, v: v, Σ: j.current, count: count, rtrl: false)
+		distributor.delta(commandBuffer: commandBuffer, Δ: Δ, j: j.current, g: g, count: count, rtrl: cell.isRecurrent)
+		update(commandBuffer: commandBuffer)
+		commandBuffer.commit()
 		
 	}
 }

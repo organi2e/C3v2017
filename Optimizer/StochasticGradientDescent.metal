@@ -14,7 +14,10 @@ constant float epsilon [[ function_constant(1) ]];
 
 kernel void StochasticGradientDescentOptimize(device float * const value [[ buffer(0) ]],
 											  device const float * const delta [[ buffer(1) ]],
+											  constant uint & N [[ buffer(2) ]],
 											  uint const n [[ thread_position_in_grid ]]) {
-	int const idx = n;
-	value[idx] += eta * delta[idx];
+	if ( n < N ) {
+		int const idx = n;
+		value[idx] += eta * delta[idx];
+	}
 }

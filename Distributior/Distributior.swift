@@ -22,6 +22,7 @@ import Metal
 public protocol Derivative {
 	func derivate(commandBuffer: MTLCommandBuffer, Δ: (μ: MTLBuffer, σ: MTLBuffer), g: (μ: MTLBuffer, σ: MTLBuffer), y: (Δ: MTLBuffer, p: MTLBuffer), v: (μ: MTLBuffer, σ: MTLBuffer), count: Int)
 	
+	func delta(commandBuffer: MTLCommandBuffer, Δ: MTLBuffer, j: (μ: MTLBuffer, σ: MTLBuffer), g: (μ: MTLBuffer, σ: MTLBuffer), count: (rows: Int, cols: Int))
 	func delta(commandBuffer: MTLCommandBuffer, Δ: (μ: MTLBuffer, σ: MTLBuffer), j: (μ: MTLBuffer, σ: MTLBuffer), g: (μ: MTLBuffer, σ: MTLBuffer), count: (rows: Int, cols: Int), rtrl: Bool)
 	
 	func jacobian(commandBuffer: MTLCommandBuffer, j: (μ: MTLBuffer, σ: MTLBuffer), v: (μ: MTLBuffer, σ: MTLBuffer), Σ: (μ: MTLBuffer, σ: MTLBuffer), count: (rows: Int, cols: Int), rtrl: Bool)

@@ -55,18 +55,24 @@ kernel void GaussActivateP(device float * const YF [[ buffer(0) ]],
 						   device float const * const VU [[ buffer(2) ]],
 						   device float const * const VS [[ buffer(3) ]],
 						   constant uchar * const seed [[ buffer(4) ]],
+						   constant uint const & N [[ buffer(5) ]],
 						   uint const n [[ thread_position_in_grid ]]) {
-	int const idx = n;
-	YF[idx] = step(float(seed[idx])/256.0, YP[idx] = fma(erf(M_SQRT1_2_F*VU[idx]/VS[idx]), 0.5, 0.5));
+	if ( n < N ) {
+		int const idx = n;
+		YF[idx] = step(float(seed[idx])/256.0, YP[idx] = fma(erf(M_SQRT1_2_F*VU[idx]/VS[idx]), 0.5, 0.5));
+	}
 }
 kernel void GaussCollect(device float * const vu [[ buffer(0) ]],
 						 device float * const vs [[ buffer(1) ]],
 						 device float const * const su [[ buffer(2) ]],
 						 device float const * const ss [[ buffer(3) ]],
+						 constant uint const & N [[ buffer(4) ]],
 						 uint const n [[ thread_position_in_grid ]]) {
-	int const idx = n;
-	vu[idx] =      su[idx];
-	vs[idx] = sqrt(ss[idx]);
+	if ( n < N ) {
+		int const idx = n;
+		vu[idx] =      su[idx];
+		vs[idx] = sqrt(ss[idx]);
+	}
 }
 kernel void GaussCollectW(device float * const su [[ buffer(0) ]],
 						  device float * const ss [[ buffer(1) ]],
@@ -154,21 +160,27 @@ kernel void GaussCollectC(device float * const su [[ buffer(0) ]],
 						  device float * const ss [[ buffer(1) ]],
 						  device float const * const cu [[ buffer(2) ]],
 						  device float const * const cs [[ buffer(3) ]],
+						  constant uint const & N [[ buffer(4) ]],
 						  uint const n [[ thread_position_in_grid ]]) {
-	int const idx = n;
-	su[idx] +=    cu[idx];
-	ss[idx] += sq(cs[idx]);
+	if ( n < N ) {
+		int const idx = n;
+		su[idx] +=    cu[idx];
+		ss[idx] += sq(cs[idx]);
+	}
 }
 kernel void GaussCollectD(device float * const su [[ buffer(0) ]],
 						  device float * const ss [[ buffer(1) ]],
 						  device float const * const d [[ buffer(2) ]],
 						  device float const * const vu [[ buffer(3) ]],
 						  device float const * const vs [[ buffer(4) ]],
+						  constant uint const & N [[ buffer(5) ]],
 						  uint const n [[ thread_position_in_grid ]]) {
-	int const idx = n;
-	float const r = d[idx];
-	su[idx] +=    r*vu[idx];
-	ss[idx] += sq(r*vs[idx]);
+	if ( n < N ) {
+		int const idx = n;
+		float const r = d[idx];
+		su[idx] +=    r*vu[idx];
+		ss[idx] += sq(r*vs[idx]);
+	}
 }
 constant float const M_SQRT1_2PI_F = 0.5 * M_2_SQRTPI_F * M_SQRT1_2_F;
 kernel void GaussDerivateP(device float * const dU [[ buffer(0) ]],
@@ -179,19 +191,21 @@ kernel void GaussDerivateP(device float * const dU [[ buffer(0) ]],
 						   device float const * const P [[ buffer(5) ]],
 						   device float const * const U [[ buffer(6) ]],
 						   device float const * const S [[ buffer(7) ]],
-						   constant uint const & length [[ buffer(8) ]],
+						   constant uint const & N [[ buffer(8) ]],
 						   uint const n [[ thread_position_in_grid ]]) {
-	int const idx = n;
-	float const u = U[idx];
-	float const s = S[idx];
-	float const x = u / s;
-	//float const p = P[idx];
-	float const d = D[idx];// * select(1.0, p * ( 1.0 - p ), 0.0 < p && p < 1.0);
-	float const g = M_SQRT1_2PI_F * exp( -0.5 * x * x );
-	float const gu = g / s;
-	float const gs = gu * -x;
-	dU[idx] = d * (gU[idx] = gu);
-	dS[idx] = d * (gS[idx] = gs);
+	if ( n < N ) {
+		int const idx = n;
+		float const u = U[idx];
+		float const s = S[idx];
+		float const x = u / s;
+		float const p = fma(erf(M_SQRT1_2_F*x), 0.5, 0.5);
+		float const d = D[idx] / select(1.0, p * ( 1.0 - p ), 0.0 < p && p < 1.0);
+		float const g = M_SQRT1_2PI_F * exp( -0.5 * x * x );
+		float const gu = g / s;
+		float const gs = gu * -x;
+		dU[idx] = d * (gU[idx] = gu);
+		dS[idx] = d * (gS[idx] = gs);
+	}
 }
 kernel void GaussJacobian(device float * const ju [[ buffer(0) ]],
 						  device float * const js [[ buffer(1) ]],
@@ -199,7 +213,7 @@ kernel void GaussJacobian(device float * const ju [[ buffer(0) ]],
 						  device float const * const s [[ buffer(3) ]],
 						  device float const * const su [[ buffer(4) ]],
 						  device float const * const ss [[ buffer(5) ]],
-						  constant uint & ld [[ buffer(6) ]],
+						  constant uint const & ld [[ buffer(6) ]],
 						  uint2 const ij [[ thread_position_in_grid ]]) {
 	int const rows = ij.x;
 	int const cols = ij.y;
@@ -218,9 +232,8 @@ kernel void GaussJacobianA(device float * const ju [[ buffer(0) ]],
 	int const cols = ij.y;
 	int const idx = cols + ld.y * rows * ld.x;
 	float const xv = x [ cols ];
-	float const sv = as [ cols + ld.y * rows ];
 	ju [ idx ] += xv;
-	js [ idx ] += xv * xv * sv;
+	js [ idx ] += xv * xv * as [ cols + ld.y * rows ];
 }
 kernel void GaussJacobianB(device float * const ju [[ buffer(0) ]],
 						   device float * const js [[ buffer(1) ]],
@@ -298,18 +311,21 @@ kernel void GaussJacobianC(device float * const ju [[ buffer(0) ]],
 						   device float * const js [[ buffer(1) ]],
 						   device float const * const cu [[ buffer(2) ]],
 						   device float const * const cs [[ buffer(3) ]],
-						   constant uint & ld [[buffer(4) ]],
+						   constant uint const & ld [[buffer(4) ]],
+						   constant uint const & K [[ buffer(5) ]],
 						   uint const k [[ thread_position_in_grid ]]) {
-	int const idx = k * ld;
-	ju[idx] += 1.0;
-	js[idx] += cs[k];
+	if ( k < K ) {
+		int const idx = k * ld;
+		ju[idx] += 1.0;
+		js[idx] += cs[k];
+	}
 }
 kernel void GaussJacobianD(device float * const ju [[ buffer(0) ]],
 						   device float * const js [[ buffer(1) ]],
 						   device float * const d [[ buffer(2) ]],
 						   device float const * const pu [[ buffer(3) ]],
 						   device float const * const ps [[ buffer(4) ]],
-						   constant uint & ld [[buffer(5) ]],
+						   constant uint const & ld [[buffer(5) ]],
 						   uint2 const ij [[ thread_position_in_grid ]]) {
 	int const rows = ij.x;
 	int const cols = ij.y;
@@ -323,15 +339,15 @@ kernel void GaussJacobianX(device float * const ju [[ buffer(0) ]],
 						   device float const * const x [[ buffer(2) ]],
 						   device float const * const wu [[ buffer(3) ]],
 						   device float const * const ws [[ buffer(4) ]],
-						   constant uint & ld [[ buffer(5) ]],
+						   constant uint const & ld [[ buffer(5) ]],
 						   uint2 const ij [[ thread_position_in_grid ]]) {
 	int const rows = ij.x;
 	int const cols = ij.y;
 	int const idx = rows * ld + cols;
-	float const u = wu[idx];
-	float const s = ws[idx];
-	ju[idx] += u;
-	js[idx] += s * s * x[cols];
+	float const u = wu [ idx ];
+	float const s = ws [ idx ];
+	ju [ idx ] += u;
+	js [ idx ] += s * s * x [ cols ];
 }
 kernel void GaussDeltaW(device float * const du [[ buffer(0) ]],
 						device float * const ds [[ buffer(1) ]],
@@ -435,7 +451,7 @@ kernel void GaussDeltaG(device float * const du [[ buffer(0) ]],
 						device float const * const js [[ buffer(3) ]],
 						device float const * const dydu [[ buffer(4) ]],
 						device float const * const dyds [[ buffer(5) ]],
-						constant uint & ld [[ buffer(6) ]],
+						constant uint const & ld [[ buffer(6) ]],
 						uint2 const ij [[ thread_position_in_grid ]]) {
 	int const rows = ij.x;
 	int const cols = ij.y;
@@ -546,7 +562,6 @@ kernel void GaussDeltaX(device float * const dx [[ buffer(0) ]],
 				 select(0, *(device float4*)(ju + idx.y), rows_mask && cols_mask.y),
 				 select(0, *(device float4*)(ju + idx.z), rows_mask && cols_mask.z),
 				 select(0, *(device float4*)(ju + idx.w), rows_mask && cols_mask.w)) * select(0, *(device float4*)(dydu + k), cols_mask);
-		
 		x +=
 		float4x4(select(0, *(device float4*)(js + idx.x), rows_mask && cols_mask.x),
 				 select(0, *(device float4*)(js + idx.y), rows_mask && cols_mask.y),
@@ -641,7 +656,7 @@ kernel void GaussJacobianMuB(device float * const G [[ buffer(0) ]],
 }
 kernel void GaussJacobianMuC(device float * const G [[ buffer(0) ]],
 							 device float const * const C [[ buffer(1) ]],
-							 constant uint & K [[ buffer(2) ]],
+							 constant uint const & K [[ buffer(2) ]],
 							 uint const k [[ thread_position_in_grid ]]) {
 	G [ k * ( K + 1 ) ] += 1.0;
 }
@@ -731,7 +746,7 @@ kernel void GaussJacobianSigmaB(device float * const G [[ buffer(0) ]],
 kernel void GaussJacobianSigmaC(device float * const G [[ buffer(0) ]],
 								device float const * const V [[ buffer(1) ]],
 								device float const * const C [[ buffer(2) ]],
-								constant uint & K [[ buffer(3) ]],
+								constant uint const & K [[ buffer(3) ]],
 								uint const k [[ thread_position_in_grid ]]) {
 	float const l = rsqrt( V [ k ] );
 	float const c = C [ k ];

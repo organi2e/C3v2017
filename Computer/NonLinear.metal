@@ -10,15 +10,11 @@
 using namespace metal;
 inline float4 sigm(float4);
 //Compute nonlinear math functions of 16-packed single precision floatings numbers, 4 times
-kernel void exp(device float4x4 * const y [[ buffer(0) ]],
-				device float4x4 const * const x [[ buffer(1) ]],
+kernel void exp(device float * const y [[ buffer(0) ]],
+				device float const * const x [[ buffer(1) ]],
 				uint const n [[ thread_position_in_grid ]]) {
 	int const idx = n;
-	float4x4 const v = x[idx];
-	y[idx] = float4x4(exp(v[0]),
-					  exp(v[1]),
-					  exp(v[2]),
-					  exp(v[3]));
+	y[idx] = exp(x[idx]);
 }
 kernel void log(device float4x4 * const y [[ buffer(0) ]],
 				device float4x4 const * const x [[ buffer(1) ]],

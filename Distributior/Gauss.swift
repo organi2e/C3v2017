@@ -8,6 +8,7 @@
 
 import Accelerate
 import Metal
+import simd
 
 public class GaussDistributor {
 	let activateP: MTLComputePipelineState
@@ -100,7 +101,8 @@ extension GaussDistributor: Activative {
 	                     v: (μ: MTLBuffer, σ: MTLBuffer), count: Int) {
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		let seed: Array<uint8> = Array<uint8>(repeating: 0, count: count)
+		let width: Int = activateP.threadExecutionWidth
+		let seed: Array<UInt8> = Array<UInt8>(repeating: 0, count: count)
 		
 		assert( encoder.device === activateP.device )
 		
@@ -109,15 +111,16 @@ extension GaussDistributor: Activative {
 		assert( count * MemoryLayout<Float>.size <= v.μ.length && activateP.device === v.μ.device )
 		assert( count * MemoryLayout<Float>.size <= v.σ.length && activateP.device === v.σ.device )
 		
-		arc4random_buf(UnsafeMutablePointer<uint8>(mutating: seed), seed.count)
+		arc4random_buf(UnsafeMutablePointer<UInt8>(mutating: seed), seed.count)
 		encoder.setComputePipelineState(activateP)
 		encoder.setBuffer(y.χ, offset: 0, at: 0)
 		encoder.setBuffer(y.p, offset: 0, at: 1)
 		encoder.setBuffer(v.μ, offset: 0, at: 2)
 		encoder.setBuffer(v.σ, offset: 0, at: 3)
 		encoder.setBytes(seed, length: seed.count, at: 4)
-		encoder.dispatchThreadgroups(.init(width: count, height: 1, depth: 1),
-		                             threadsPerThreadgroup: .init(width: 1, height: 1, depth: 1))
+		encoder.setBytes([uint(count)], length: MemoryLayout<uint>.size, at: 5)
+		encoder.dispatchThreadgroups(.init(width: (count-1)/width+1, height: 1, depth: 1),
+		                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
 		encoder.endEncoding()
 	}
 	public func collect(commandBuffer: MTLCommandBuffer,
@@ -125,6 +128,7 @@ extension GaussDistributor: Activative {
 	                    Σ: (μ: MTLBuffer, σ: MTLBuffer), count: Int) {
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		let width: Int = collect.threadExecutionWidth
 		
 		assert( collect.device === encoder.device )
 		
@@ -139,8 +143,9 @@ extension GaussDistributor: Activative {
 		encoder.setBuffer(v.σ, offset: 0, at: 1)
 		encoder.setBuffer(Σ.μ, offset: 0, at: 2)
 		encoder.setBuffer(Σ.σ, offset: 0, at: 3)
-		encoder.dispatchThreadgroups(.init(width: count, height: 1, depth: 1),
-		                             threadsPerThreadgroup: .init(width: 1, height: 1, depth: 1))
+		encoder.setBytes([uint(count)], length: MemoryLayout<uint>.size, at: 4)
+		encoder.dispatchThreadgroups(.init(width: (count-1)/width+1, height: 1, depth: 1),
+		                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
 		encoder.endEncoding()
 	}
 	public func collect(commandBuffer: MTLCommandBuffer, Σ: (μ: MTLBuffer, σ: MTLBuffer), w: (μ: MTLBuffer, σ: MTLBuffer), x: MTLBuffer, count: (rows: Int, cols: Int)) {
@@ -166,7 +171,7 @@ extension GaussDistributor: Activative {
 		encoder.setBytes([uint(count.rows), uint(count.cols)], length: 2*MemoryLayout<uint>.size, at: 5)
 		encoder.setThreadgroupMemoryLength(4*width*MemoryLayout<Float>.size, at: 0)
 		encoder.setThreadgroupMemoryLength(4*width*MemoryLayout<Float>.size, at: 1)
-		encoder.dispatchThreadgroups(.init(width: (count.rows-1)/4+1, height: 1, depth: 1),
+		encoder.dispatchThreadgroups(.init(width: (count.rows+3)/4, height: 1, depth: 1),
 		                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
 		encoder.endEncoding()
 	}
@@ -180,21 +185,21 @@ extension GaussDistributor: Activative {
 		assert( collectC.device === c.σ.device && count * MemoryLayout<Float>.size <= c.σ.length )
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		let width: Int = collectC.threadExecutionWidth
 		encoder.setComputePipelineState(collectC)
 		encoder.setBuffer(Σ.μ, offset: 0, at: 0)
 		encoder.setBuffer(Σ.σ, offset: 0, at: 1)
 		encoder.setBuffer(c.μ, offset: 0, at: 2)
 		encoder.setBuffer(c.σ, offset: 0, at: 3)
-		encoder.dispatchThreadgroups(.init(width: count, height: 1, depth: 1),
-		                             threadsPerThreadgroup: .init(width: 1, height: 1, depth: 1))
+		encoder.setBytes([uint(count)], length: MemoryLayout<uint>.size, at: 4)
+		encoder.dispatchThreadgroups(.init(width: (count-1)/width+1, height: 1, depth: 1),
+		                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
 		encoder.endEncoding()
 	}
 	
 	public func collect(commandBuffer: MTLCommandBuffer, Σ: (μ: MTLBuffer, σ: MTLBuffer), d: MTLBuffer, v: (μ: MTLBuffer, σ: MTLBuffer), count: Int) {
 		
-		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		
-		assert( collectD.device === encoder.device )
+		assert( collectD.device === commandBuffer.device )
 		
 		assert( collectD.device === Σ.μ.device && count * MemoryLayout<Float>.size <= Σ.μ.length )
 		assert( collectD.device === Σ.σ.device && count * MemoryLayout<Float>.size <= Σ.σ.length )
@@ -204,14 +209,18 @@ extension GaussDistributor: Activative {
 		assert( collectD.device === v.μ.device && count * MemoryLayout<Float>.size <= v.μ.length )
 		assert( collectD.device === v.σ.device && count * MemoryLayout<Float>.size <= v.σ.length )
 		
+		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		let width: Int = collectD.threadExecutionWidth
+		
 		encoder.setComputePipelineState(collectD)
 		encoder.setBuffer(Σ.μ, offset: 0, at: 0)
 		encoder.setBuffer(Σ.σ, offset: 0, at: 1)
 		encoder.setBuffer(d, offset: 0, at: 2)
 		encoder.setBuffer(v.μ, offset: 0, at: 3)
 		encoder.setBuffer(v.σ, offset: 0, at: 4)
-		encoder.dispatchThreadgroups(.init(width: count, height: 1, depth: 1),
-		                             threadsPerThreadgroup: .init(width: 1, height: 1, depth: 1))
+		encoder.setBytes([uint(count)], length: MemoryLayout<uint>.size, at: 5)
+		encoder.dispatchThreadgroups(.init(width: (count-1)/width+1, height: 1, depth: 1),
+		                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
 		encoder.endEncoding()
 	}
 
@@ -235,6 +244,7 @@ extension GaussDistributor: Derivative {
 		assert( activateP.device === v.σ.device && count * MemoryLayout<Float>.size <= v.σ.length )
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		let width: Int = derivateP.threadExecutionWidth
 		encoder.setComputePipelineState(derivateP)
 		encoder.setBuffer(Δ.μ, offset: 0, at: 0)
 		encoder.setBuffer(Δ.σ, offset: 0, at: 1)
@@ -244,10 +254,29 @@ extension GaussDistributor: Derivative {
 		encoder.setBuffer(y.p, offset: 0, at: 5)
 		encoder.setBuffer(v.μ, offset: 0, at: 6)
 		encoder.setBuffer(v.σ, offset: 0, at: 7)
-		encoder.dispatchThreadgroups(.init(width: count, height: 1, depth: 1),
-		                             threadsPerThreadgroup: .init(width: 1, height: 1, depth: 1))
+		encoder.setBytes([uint(count)], length: MemoryLayout<uint>.size, at: 8)
+		encoder.dispatchThreadgroups(.init(width: (count-1)/width+1, height: 1, depth: 1),
+		                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
 		encoder.endEncoding()
 		
+	}
+	public func delta(commandBuffer: MTLCommandBuffer,
+	                  Δ: MTLBuffer,
+	                  j: (μ: MTLBuffer, σ: MTLBuffer),
+	                  g: (μ: MTLBuffer, σ: MTLBuffer), count: (rows: Int, cols: Int)) {
+		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		let width: Int = deltaJ.threadExecutionWidth
+		encoder.setComputePipelineState(deltaX)
+		encoder.setBuffer(Δ, offset: 0, at: 0)
+		encoder.setBuffer(j.μ, offset: 0, at: 1)
+		encoder.setBuffer(j.σ, offset: 0, at: 2)
+		encoder.setBuffer(g.μ, offset: 0, at: 3)
+		encoder.setBuffer(g.σ, offset: 0, at: 4)
+		encoder.setBytes([uint(count.cols), uint(count.rows)], length: 2*MemoryLayout<uint>.size, at: 5)
+		encoder.setThreadgroupMemoryLength(4*width*MemoryLayout<Float>.size, at: 0)
+		encoder.dispatchThreadgroups(.init(width: (count.cols+3)/4, height: 1, depth: 1),
+		                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
+		encoder.endEncoding()
 	}
 	public func delta(commandBuffer: MTLCommandBuffer,
 	                  Δ: (μ: MTLBuffer, σ: MTLBuffer),
@@ -417,14 +446,16 @@ extension GaussDistributor: Derivative {
 		assert( jacobianC.device === c.σ.device && rows * MemoryLayout<Float>.size <= c.σ.length )
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		let width: Int = jacobianC.threadExecutionWidth
 		encoder.setComputePipelineState(jacobianC)
 		encoder.setBuffer(Σ.μ, offset: 0, at: 0)
 		encoder.setBuffer(Σ.σ, offset: 0, at: 1)
 		encoder.setBuffer(c.μ, offset: 0, at: 2)
 		encoder.setBuffer(c.σ, offset: 0, at: 3)
 		encoder.setBytes([uint(ld)], length: MemoryLayout<uint>.size, at: 4)
-		encoder.dispatchThreadgroups(.init(width: rows, height: 1, depth: 1),
-		                             threadsPerThreadgroup: .init(width: 1, height: 1, depth: 1))
+		encoder.setBytes([uint(count)], length: MemoryLayout<uint>.size, at: 5)
+		encoder.dispatchThreadgroups(.init(width: (rows-1)/width, height: 1, depth: 1),
+		                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
 		encoder.endEncoding()
 	}
 	//jd
