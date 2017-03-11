@@ -19,6 +19,8 @@
 		8707670A1E713E3D00FBD2D1 /* Ridge.metal in Sources */ = {isa = PBXBuildFile; fileRef = 870767091E713E3D00FBD2D1 /* Ridge.metal */; };
 		8707670B1E71404F00FBD2D1 /* Adapter.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 870766E01E7133B300FBD2D1 /* Adapter.framework */; };
 		8707670C1E71405D00FBD2D1 /* Adapter.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 870766E01E7133B300FBD2D1 /* Adapter.framework */; };
+		870BE9101E7170420025A9D3 /* Regular.swift in Sources */ = {isa = PBXBuildFile; fileRef = 870BE90F1E7170420025A9D3 /* Regular.swift */; };
+		870BE9121E7170520025A9D3 /* Regular.metal in Sources */ = {isa = PBXBuildFile; fileRef = 870BE9111E7170520025A9D3 /* Regular.metal */; };
 		870C4C3D1E3CD66000AF6DE7 /* Linear.swift in Sources */ = {isa = PBXBuildFile; fileRef = 870C4C3C1E3CD66000AF6DE7 /* Linear.swift */; };
 		870C4C651E3CD91E00AF6DE7 /* Cauchy.metal in Sources */ = {isa = PBXBuildFile; fileRef = 870C4C601E3CD91E00AF6DE7 /* Cauchy.metal */; };
 		870C4C661E3CD91E00AF6DE7 /* Cauchy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 870C4C611E3CD91E00AF6DE7 /* Cauchy.swift */; };
@@ -28,6 +30,8 @@
 		870C4CA21E3D782700AF6DE7 /* Optimizer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 875931531E3B5BA8006B60FF /* Optimizer.framework */; };
 		872E7FB31E64784C00687895 /* SMORMS3.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872E7FB21E64784C00687895 /* SMORMS3.swift */; };
 		872E7FB51E64785E00687895 /* SMORMS3.metal in Sources */ = {isa = PBXBuildFile; fileRef = 872E7FB41E64785E00687895 /* SMORMS3.metal */; };
+		87392C051E72F58C00706D1F /* Linear.metal in Sources */ = {isa = PBXBuildFile; fileRef = 87392C031E72F58C00706D1F /* Linear.metal */; };
+		87392C061E72F58C00706D1F /* Linear.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87392C041E72F58C00706D1F /* Linear.swift */; };
 		8740ED531E41A0B400D6B6B1 /* Feedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8740ED521E41A0B400D6B6B1 /* Feedback.swift */; };
 		8759312F1E3B3850006B60FF /* Distributor.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 875931251E3B384F006B60FF /* Distributor.framework */; };
 		875931341E3B3850006B60FF /* DistributorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875931331E3B3850006B60FF /* DistributorTests.swift */; };
@@ -151,6 +155,8 @@
 		870767031E7135D900FBD2D1 /* Lasso.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; name = Lasso.metal; path = ../../Adapter/Lasso.metal; sourceTree = "<group>"; };
 		870767071E713E3100FBD2D1 /* Ridge.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Ridge.swift; path = ../../Adapter/Ridge.swift; sourceTree = "<group>"; };
 		870767091E713E3D00FBD2D1 /* Ridge.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; name = Ridge.metal; path = ../../Adapter/Ridge.metal; sourceTree = "<group>"; };
+		870BE90F1E7170420025A9D3 /* Regular.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Regular.swift; path = ../../Adapter/Regular.swift; sourceTree = "<group>"; };
+		870BE9111E7170520025A9D3 /* Regular.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; name = Regular.metal; path = ../../Adapter/Regular.metal; sourceTree = "<group>"; };
 		870C4C3C1E3CD66000AF6DE7 /* Linear.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Linear.swift; path = ../../Computer/Linear.swift; sourceTree = "<group>"; };
 		870C4C601E3CD91E00AF6DE7 /* Cauchy.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; name = Cauchy.metal; path = ../../Distributior/Cauchy.metal; sourceTree = "<group>"; };
 		870C4C611E3CD91E00AF6DE7 /* Cauchy.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Cauchy.swift; path = ../../Distributior/Cauchy.swift; sourceTree = "<group>"; };
@@ -159,6 +165,8 @@
 		870C4C641E3CD91E00AF6DE7 /* Gauss.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Gauss.swift; path = ../../Distributior/Gauss.swift; sourceTree = "<group>"; };
 		872E7FB21E64784C00687895 /* SMORMS3.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = SMORMS3.swift; path = ../../Optimizer/SMORMS3.swift; sourceTree = "<group>"; };
 		872E7FB41E64785E00687895 /* SMORMS3.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; name = SMORMS3.metal; path = ../../Optimizer/SMORMS3.metal; sourceTree = "<group>"; };
+		87392C031E72F58C00706D1F /* Linear.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; name = Linear.metal; path = ../../Adapter/Linear.metal; sourceTree = "<group>"; };
+		87392C041E72F58C00706D1F /* Linear.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Linear.swift; path = ../../Adapter/Linear.swift; sourceTree = "<group>"; };
 		8740ED521E41A0B400D6B6B1 /* Feedback.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Feedback.swift; path = "../../C³/Feedback.swift"; sourceTree = "<group>"; };
 		875931251E3B384F006B60FF /* Distributor.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Distributor.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		875931281E3B384F006B60FF /* Distributor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Distributor.h; sourceTree = "<group>"; };
@@ -350,12 +358,16 @@
 		870766E11E7133B300FBD2D1 /* Adapter */ = {
 			isa = PBXGroup;
 			children = (
+				87392C031E72F58C00706D1F /* Linear.metal */,
+				87392C041E72F58C00706D1F /* Linear.swift */,
 				870766FF1E7135C200FBD2D1 /* Lasso.swift */,
 				870767031E7135D900FBD2D1 /* Lasso.metal */,
 				870767071E713E3100FBD2D1 /* Ridge.swift */,
 				870767091E713E3D00FBD2D1 /* Ridge.metal */,
 				870766FB1E71357100FBD2D1 /* Exponential.swift */,
 				870766FD1E71358000FBD2D1 /* Exponential.metal */,
+				870BE90F1E7170420025A9D3 /* Regular.swift */,
+				870BE9111E7170520025A9D3 /* Regular.metal */,
 				870766F71E7133C300FBD2D1 /* Adapter.swift */,
 				870766E21E7133B300FBD2D1 /* Adapter.h */,
 				870766E31E7133B300FBD2D1 /* Info.plist */,
@@ -1110,12 +1122,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				870767001E7135C200FBD2D1 /* Lasso.swift in Sources */,
 				870766F81E7133C300FBD2D1 /* Adapter.swift in Sources */,
+				870BE9101E7170420025A9D3 /* Regular.swift in Sources */,
+				87392C061E72F58C00706D1F /* Linear.swift in Sources */,
+				870BE9121E7170520025A9D3 /* Regular.metal in Sources */,
+				870767001E7135C200FBD2D1 /* Lasso.swift in Sources */,
 				870767041E7135D900FBD2D1 /* Lasso.metal in Sources */,
-				870766FE1E71358000FBD2D1 /* Exponential.metal in Sources */,
 				870766FC1E71357100FBD2D1 /* Exponential.swift in Sources */,
+				870766FE1E71358000FBD2D1 /* Exponential.metal in Sources */,
 				870767081E713E3100FBD2D1 /* Ridge.swift in Sources */,
+				87392C051E72F58C00706D1F /* Linear.metal in Sources */,
 				8707670A1E713E3D00FBD2D1 /* Ridge.metal in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2760,6 +2776,7 @@
 				870766F31E7133B400FBD2D1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		870766F41E7133B400FBD2D1 /* Build configuration list for PBXNativeTarget "AdapterTests" */ = {
 			isa = XCConfigurationList;
@@ -2768,6 +2785,7 @@
 				870766F61E7133B400FBD2D1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		8759311D1E3B3823006B60FF /* Build configuration list for PBXProject "macOS" */ = {
 			isa = XCConfigurationList;

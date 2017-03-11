@@ -454,7 +454,7 @@ extension GaussDistributor: Derivative {
 		encoder.setBuffer(c.σ, offset: 0, at: 3)
 		encoder.setBytes([uint(ld)], length: MemoryLayout<uint>.size, at: 4)
 		encoder.setBytes([uint(count)], length: MemoryLayout<uint>.size, at: 5)
-		encoder.dispatchThreadgroups(.init(width: (rows-1)/width, height: 1, depth: 1),
+		encoder.dispatchThreadgroups(.init(width: (rows-1)/width+1, height: 1, depth: 1),
 		                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
 		encoder.endEncoding()
 	}

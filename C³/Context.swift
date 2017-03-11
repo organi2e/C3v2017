@@ -27,8 +27,9 @@ public class Context: NSManagedObjectContext {
 	let math: Math
 	let gaussFactory: Distributor
 	let optimizerFactory: (Int) -> Optimizer
-	let lassoFactory: (Int) -> Adapter
+	let linFactory: (Int) -> Adapter
 	let expFactory: (Int) -> Adapter
+	let regFactory: (Int) -> Adapter
 	enum ErrorCase: Error, CustomStringConvertible {
 		case InvalidContext
 		case InvalidEntity(name: String)
@@ -56,8 +57,9 @@ public class Context: NSManagedObjectContext {
 		math = try Math(device: device)
 		gaussFactory = try GaussDistributor.factory()(device)
 		optimizerFactory = try optimizer(device)
-		lassoFactory = try Lasso.factory(λ: 0)(device)
+		linFactory = try Linear.factory()(device)
 		expFactory = try Exponential.factory()(device)
+		regFactory = try Regular.factory()(device)
 		super.init(concurrencyType: concurrencyType)
 		guard let model: NSManagedObjectModel = NSManagedObjectModel.mergedModel(from: [Bundle(for: type(of: self))]) else { throw ErrorCase.NoModelFound }
 		let store: NSPersistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
@@ -72,16 +74,15 @@ public class Context: NSManagedObjectContext {
 		math = try!Math(device: device)
 		gaussFactory = try!GaussDistributor.factory()(device)
 		optimizerFactory = try!SGD.factory()(device)
-		lassoFactory = try!Lasso.factory(λ: 0)(device)
+		linFactory = try!Linear.factory()(device)
 		expFactory = try!Exponential.factory()(device)
+		regFactory = try!Regular.factory()(device)
 		super.init(coder: aDecoder)
 		fatalError()
 	}
 	public override func encode(with aCoder: NSCoder) {
 		super.encode(with: aCoder)
 	}
-}
-extension Context {
 }
 extension Context {
 	internal func make(count: Int) -> Optimizer {
@@ -110,13 +111,13 @@ extension Context {
 		commandBuffer.waitUntilCompleted()
 	}
 }
-extension NSManagedObject {
+extension ManagedObject {
 	internal var context: Context {
 		guard let context: Context = managedObjectContext as? Context else { fatalError(Context.ErrorCase.InvalidContext.description) }
 		return context
 	}
 }
-extension MTLBuffer {
+extension Buffer {
 	internal var buffer: UnsafeMutableBufferPointer<Float> {
 		return UnsafeMutableBufferPointer<Float>(start: UnsafeMutablePointer<Float>(OpaquePointer(contents())), count: length/MemoryLayout<Float>.size)
 	}

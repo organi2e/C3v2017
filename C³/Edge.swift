@@ -34,9 +34,9 @@ extension Edge {
 	internal func collect(distributor: Distributor, Σ: (μ: Buffer, σ: Buffer), ignore: Set<Cell>) {
 		let x: Buffer = input.collect(ignore: ignore)
 		let commandBuffer: CommandBuffer = context.make()
-		distributor.collect(commandBuffer: commandBuffer, Σ: Σ, w: χ, x: x, count: shape)
-		distributor.jacobian(commandBuffer: commandBuffer, Σ: j.current.a, a: χ, x: x, count: shape, rtrl: false)
-		distributor.jacobian(commandBuffer: commandBuffer, Σ: j.current.x, x: x, a: χ, count: shape, rtrl: false)
+		distributor.collect(commandBuffer: commandBuffer, Σ: Σ, w: θ, x: x, count: shape)
+		distributor.jacobian(commandBuffer: commandBuffer, Σ: j.current.a, a: θ, x: x, count: shape, rtrl: false)
+		distributor.jacobian(commandBuffer: commandBuffer, Σ: j.current.x, x: x, a: θ, count: shape, rtrl: false)
 		commandBuffer.commit()
 	}
 	internal func correct_clear(ignore: Set<Cell>) {
@@ -49,7 +49,7 @@ extension Edge {
 		commandBuffer.commit()
 	}
 	internal func correct(distributor: Distributor, Σ: Buffer, ignore: Set<Cell>) {
-		let (g, v): ((μ: Buffer, σ: Buffer),(μ: Buffer, σ: Buffer)) = output.correct(ignore: ignore)
+		let (g, v): ((μ: Buffer, σ: Buffer), (μ: Buffer, σ: Buffer)) = output.correct(ignore: ignore)
 		let commandBuffer: CommandBuffer = context.make()
 		distributor.jacobian(commandBuffer: commandBuffer, j: j.current.x, v: v, Σ: j.current.x, count: shape, rtrl: false)
 		distributor.jacobian(commandBuffer: commandBuffer, j: j.current.a, v: v, Σ: j.current.a, count: shape, rtrl: false)

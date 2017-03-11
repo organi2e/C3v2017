@@ -260,14 +260,14 @@ extension Context {
 		try output.forEach {
 			let _: Edge = try make(output: $0, input: cell)
 		}
-		if decay {
-			
-		}
 		if recurrent {
 			
 		}
 		cell.bias = try make(cell: cell)
 		cell.setup()
+		if decay {
+			
+		}
 		return cell
 	}
 }

@@ -100,7 +100,7 @@ class C3Tests: XCTestCase {
 //			let context: Context = try Context(optimizer: Adam.factory(α: 1e-3))
 			let context: Context = try Context(optimizer: SMORMS3.factory(α: 1e-3))
 			//let context: Context = try Context(optimizer: SGD.factory(η: 1e-1))
-//			context.layout = .storageModeShared
+			//			context.layout = .storageModeShared
 			
 			let IS: [[Float]] = [[0,0,0,1], [0,0,1,0], [0,0,1,1], [0,1,0,0]]
 			let OS: [[Float]] = [[0,0,0,1], [0,0,1,0], [0,1,0,0], [1,0,0,0]]
@@ -132,10 +132,10 @@ class C3Tests: XCTestCase {
 			context.sync()
 			try context.save()
 			
-//			print("μ", Array(O.delta.current.μ.buffer))
-//			print("Δ", Array(O.input.first!.μ.Δ.buffer))
-//			print("θ", Array(O.input.first!.μ.θ.buffer))
-//			print("φ", Array(O.input.first!.μ.φ.buffer))
+			//			print("μ", Array(O.delta.current.μ.buffer))
+			//			print("Δ", Array(O.input.first!.μ.Δ.buffer))
+			//			print("θ", Array(O.input.first!.μ.θ.buffer))
+			//			print("φ", Array(O.input.first!.μ.φ.buffer))
 			
 			for k in 0..<4 {
 				O.collect_clear()
@@ -143,13 +143,13 @@ class C3Tests: XCTestCase {
 				I.source = IS[k]
 				O.target = OS[k]
 				O.collect()
-//				I.correct()
-//				context.sync()
+				//				I.correct()
+				//				context.sync()
 				print(O.target, O.source)
-//				print("μ", Array(O.delta.current.μ.buffer))
-//				print("Δ", Array(O.input.first!.μ.Δ.buffer))
-//				print("θ", Array(O.input.first!.μ.θ.buffer))
-//				print("φ", Array(O.input.first!.μ.φ.buffer))
+				//				print("μ", Array(O.delta.current.μ.buffer))
+				//				print("Δ", Array(O.input.first!.μ.Δ.buffer))
+				//				print("θ", Array(O.input.first!.μ.θ.buffer))
+				//				print("φ", Array(O.input.first!.μ.φ.buffer))
 			}
 			
 		} catch {

@@ -31,8 +31,8 @@ extension Bias {
 	internal func collect(distributor: Distributor, Σ: (μ: Buffer, σ: Buffer), ignore: Set<Cell>) {
 		let count: Int = cell.width
 		let commandBuffer: CommandBuffer = context.make()
-		distributor.collect(commandBuffer: commandBuffer, Σ: Σ, c: χ, count: count)
-		distributor.jacobian(commandBuffer: commandBuffer, Σ: j.current, c: χ, count: count, rtrl: false)
+		distributor.collect(commandBuffer: commandBuffer, Σ: Σ, c: θ, count: count)
+		distributor.jacobian(commandBuffer: commandBuffer, Σ: j.current, c: θ, count: count, rtrl: false)
 		commandBuffer.commit()
 	}
 	internal func correct_clear(commandBuffer: CommandBuffer, ignore: Set<Cell>) {
@@ -49,7 +49,6 @@ extension Bias {
 		distributor.delta(commandBuffer: commandBuffer, Δ: Δ, j: j.current, g: g, count: count, rtrl: cell.isRecurrent)
 		update(commandBuffer: commandBuffer)
 		commandBuffer.commit()
-		
 	}
 }
 extension Context {

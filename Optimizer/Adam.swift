@@ -7,19 +7,18 @@
 //
 
 import Metal
+import simd
 
 public class Adam {
 	let optimizer: MTLComputePipelineState
 	let parameters: MTLBuffer
-	let groups: MTLSize
-	let threads: MTLSize
+	let limit: Int
 	private init(pipeline: MTLComputePipelineState, count: Int) {
-		groups = MTLSize(width: count, height: 1, depth: 1)
-		threads = MTLSize(width: 1, height: 1, depth: 1)
 		optimizer = pipeline
-		parameters = pipeline.device.makeBuffer(length: 2*groups.width*MemoryLayout<Float>.size, options: .storageModePrivate)
+		parameters = pipeline.device.makeBuffer(length: count*MemoryLayout<float2>.size, options: .storageModePrivate)
+		limit = count
 	}
-	public static func factory(α: Float = 1e-3, β: Float = 0.9, γ: Float = 0.999, ε: Float = 1e-8) -> (MTLDevice) throws -> (Int) -> Optimizer {
+	public static func factory(α: Float = 1e-3, β: Float = 0.9, γ: Float = 0.999, ε: Float = 0) -> (MTLDevice) throws -> (Int) -> Optimizer {
 		let bundle: Bundle = Bundle(for: self)
 		let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
 		constantValues.setConstantValue([α], type: .float, withName: "alpha")
@@ -40,17 +39,20 @@ extension Adam: Optimizer {
 	public func optimize(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δ: MTLBuffer) {
 		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
+		let width: Int = optimizer.threadExecutionWidth
 		
 		assert( optimizer.device === encoder.device )
 		
-		assert( optimizer.device === θ.device && groups.width * MemoryLayout<Float>.size <= θ.length )
-		assert( optimizer.device === Δ.device && groups.width * MemoryLayout<Float>.size <= Δ.length )
+		assert( optimizer.device === θ.device && limit * MemoryLayout<Float>.size <= θ.length )
+		assert( optimizer.device === Δ.device && limit * MemoryLayout<Float>.size <= Δ.length )
 		
 		encoder.setComputePipelineState(optimizer)
 		encoder.setBuffer(θ, offset: 0, at: 0)
 		encoder.setBuffer(parameters, offset: 0, at: 1)
 		encoder.setBuffer(Δ, offset: 0, at: 2)
-		encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
+		encoder.setBytes([uint(limit)], length: MemoryLayout<uint>.size, at: 3)
+		encoder.dispatchThreadgroups(MTLSize(width: (limit-1)/width+1, height: 1, depth: 1),
+		                             threadsPerThreadgroup: MTLSize(width: width, height: 1, depth: 1))
 		encoder.endEncoding()
 		
 	}

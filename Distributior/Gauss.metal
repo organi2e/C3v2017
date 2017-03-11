@@ -79,9 +79,9 @@ kernel void GaussCollectW(device float * const su [[ buffer(0) ]],
 						  device float const * const wu [[ buffer(2) ]],
 						  device float const * const ws [[ buffer(3) ]],
 						  device float const * const x [[ buffer(4) ]],
+						  constant uint2 & S [[ buffer(5) ]],
 						  threadgroup float4 * shared_u [[ threadgroup(0) ]],
 						  threadgroup float4 * shared_s [[ threadgroup(1) ]],
-						  constant uint2 & S [[ buffer(5) ]],
 						  uint const t [[ thread_position_in_threadgroup ]],
 						  uint const T [[ threads_per_threadgroup ]],
 						  uint const n [[ threadgroup_position_in_grid ]]) {
@@ -188,7 +188,7 @@ kernel void GaussDerivateP(device float * const dU [[ buffer(0) ]],
 						   device float * const gU [[ buffer(2) ]],
 						   device float * const gS [[ buffer(3) ]],
 						   device float const * const D [[ buffer(4) ]],
-						   device float const * const P [[ buffer(5) ]],
+						   device float const * const F [[ buffer(5) ]],
 						   device float const * const U [[ buffer(6) ]],
 						   device float const * const S [[ buffer(7) ]],
 						   constant uint const & N [[ buffer(8) ]],
@@ -198,9 +198,9 @@ kernel void GaussDerivateP(device float * const dU [[ buffer(0) ]],
 		float const u = U[idx];
 		float const s = S[idx];
 		float const x = u / s;
-		float const e = erf(M_SQRT1_2_F*x);
-		float const r = -4 / fma(e, e, -1);
-		float const d = sign(D[idx]) * select(1.0, r, isnormal(r));//Avoid infinite,
+//		float const e = erf(M_SQRT1_2_F*x);
+//		float const r = -4 / fma(e, e, -1);
+		float const d = sign(D[idx]);// * select(1.0, r, isnormal(r));//Avoid infinite,
 		float const g = M_SQRT1_2PI_F * exp(-0.5 * x * x );
 		float const gu = g / s;
 		float const gs = gu * -x;

@@ -7,22 +7,17 @@
 //
 
 import Metal
-
+import simd
 public class SMORMS3 {
 	let parameters: MTLBuffer
 	let optimizer: MTLComputePipelineState
-	let groups: MTLSize
-	let threads: MTLSize
-	let count: Int
-	private init(pipeline: MTLComputePipelineState, count N: Int) {
-		let width: Int = pipeline.threadExecutionWidth
-		count = N
-		groups = MTLSize(width: (count-1)/width+1, height: 1, depth: 1)
-		threads = MTLSize(width: width, height: 1, depth: 1)
+	let limit: Int
+	private init(pipeline: MTLComputePipelineState, count: Int) {
+		limit = count
 		optimizer = pipeline
-		parameters = pipeline.device.makeBuffer(length: count*3*MemoryLayout<Float>.size, options: .storageModePrivate)
+		parameters = pipeline.device.makeBuffer(length: count*MemoryLayout<float3>.size, options: .storageModePrivate)
 	}
-	public static func factory(α: Float = 5e-1, ε: Float = 1e-12) -> (MTLDevice) throws -> (Int) -> Optimizer {
+	public static func factory(α: Float = 0.9, ε: Float = 0.0) -> (MTLDevice) throws -> (Int) -> Optimizer {
 		let bundle: Bundle = Bundle(for: self)
 		let constantValues: MTLFunctionConstantValues = MTLFunctionConstantValues()
 		constantValues.setConstantValue([α], type: .float, withName: "alpha")
@@ -40,19 +35,20 @@ public class SMORMS3 {
 extension SMORMS3: Optimizer {
 	public func optimize(commandBuffer: MTLCommandBuffer, θ: MTLBuffer, Δ: MTLBuffer) {
 		
+		assert( optimizer.device === commandBuffer.device )
+		assert( optimizer.device === θ.device && limit * MemoryLayout<Float>.size <= θ.length )
+		assert( optimizer.device === Δ.device && limit * MemoryLayout<Float>.size <= Δ.length )
+		
 		let encoder: MTLComputeCommandEncoder = commandBuffer.makeComputeCommandEncoder()
-		
-		assert( optimizer.device === encoder.device )
-		
-		assert( optimizer.device === θ.device && count * MemoryLayout<Float>.size <= θ.length )
-		assert( optimizer.device === Δ.device && count * MemoryLayout<Float>.size <= Δ.length )
+		let width: Int = optimizer.threadExecutionWidth
 		
 		encoder.setComputePipelineState(optimizer)
 		encoder.setBuffer(θ, offset: 0, at: 0)
 		encoder.setBuffer(parameters, offset: 0, at: 1)
 		encoder.setBuffer(Δ, offset: 0, at: 2)
-		encoder.setBytes([uint(count)], length: MemoryLayout<uint>.size, at: 3)
-		encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
+		encoder.setBytes([uint(limit)], length: MemoryLayout<uint>.size, at: 3)
+		encoder.dispatchThreadgroups(.init(width: (limit-1)/width+1, height: 1, depth: 1),
+		                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
 		encoder.endEncoding()
 		
 	}

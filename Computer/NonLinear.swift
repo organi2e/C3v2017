@@ -24,11 +24,11 @@ extension Computer {
 			//encoder.dispatchThreadgroups(MTLSize(width: (count-1)/(threads.width*64)+1, height: 1, depth: 1), threadsPerThreadgroup: threads)
 			encoder.endEncoding()
 		}
-		else {
-			commandBuffer.addCompletedHandler { (_: CommandBuffer) in
-				vForce(y.reference(), x.reference(), [Int32(count)])
-			}
-		}
+		//else {
+		//	commandBuffer.addCompletedHandler { (_: CommandBuffer) in
+		//		vForce(y.reference(), x.reference(), [Int32(count)])
+		//	}
+		//}
 		commandBuffer.commit()
 	}
 	public func log(y: Buffer, x: Buffer, count: Int) {

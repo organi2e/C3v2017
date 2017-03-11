@@ -17,18 +17,18 @@ constant float epsilon [[ function_constant(3) ]];
 kernel void AdamOptimize(device float * const theta [[ buffer(0) ]],
 						 device float2 * const parameters [[ buffer(1) ]],
 						 device const float * const delta [[ buffer(2) ]],
+						 constant uint const & N [[ buffer(3) ]],
 						 uint const n [[ thread_position_in_grid ]]) {
-	int const idx = n;
-	float const g = delta[idx];
-	float2 p = parameters[idx];
+	if ( n < N ) {
+		int const idx = n;
+		float const g = delta[idx];
+		float2 p = parameters[idx];
+		
+		p = mix(float2(g, g*g), p, float2(beta, gamma));
 	
-	p.x = mix(g, p.x, beta);
-	//p.v = mix(fabs(g), p.v, beta);//L1
-	p.y = mix(g*g, p.y, gamma);//L2
-	//p.v = max(fabs(g), beta*p.v);//L-Inf
-	
-	//theta[n] += alpha * div(p.u, sup(p.v, epsilon));//L1orL-Inf
-	theta[idx] -= alpha * p.x * rsqrt(p.y + epsilon);
-	
-	parameters[idx] = p;
+		float const r = rsqrt(p.y+epsilon);
+		theta[idx] -= alpha * p.x * select(0.0, r, isnormal(r));
+		
+		parameters[idx] = p;
+	}
 }

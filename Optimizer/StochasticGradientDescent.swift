@@ -22,14 +22,10 @@ public class StochasticGradientDescent {
 	}
 	private init(pipeline: MTLComputePipelineState, count: Int) {
 		
-		let width: Int = pipeline.threadExecutionWidth
-		
-		let groups: MTLSize = MTLSize(width: (count-1)/width+1, height: 1, depth: 1)
-		let threads: MTLSize = MTLSize(width: width, height: 1, depth: 1)
-		
 		optimizer = {
 			
 			let encoder: MTLComputeCommandEncoder = $0.0.makeComputeCommandEncoder()
+			let width: Int = pipeline.threadExecutionWidth
 
 			assert( pipeline.device === encoder.device)
 			assert( pipeline.device === $0.1.device && count * MemoryLayout<Float>.size <= $0.1.length )
@@ -39,7 +35,8 @@ public class StochasticGradientDescent {
 			encoder.setBuffer($0.1, offset: 0, at: 0)
 			encoder.setBuffer($0.2, offset: 0, at: 1)
 			encoder.setBytes([uint(count)], length: MemoryLayout<uint>.size, at: 2)
-			encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
+			encoder.dispatchThreadgroups(.init(width: (count-1)/width+1, height: 1, depth: 1),
+			                             threadsPerThreadgroup: .init(width: width, height: 1, depth: 1))
 			encoder.endEncoding()
 			
 		}

@@ -393,10 +393,8 @@ extension GaussDistributorTests {
 		
 		let rmse: Float = la_norm_as_float(δ, norm)
 		
-		XCTAssert(!rmse.isNaN && rmse < 1e-5)
-	
-		print(la_Δμ.array)
-		print(Array(Δ.buffer))
+		XCTAssert(!rmse.isNaN && rmse < 1e-4)
+		print(rmse)
 		
 	}
 	func testJacobian() {
@@ -738,6 +736,7 @@ extension GaussDistributorTests {
 		)
 		XCTAssert( ( rmse.μ == 0 || rmse.μ.isNormal ) && rmse.μ < 1e-3 )
 		XCTAssert( ( rmse.σ == 0 || rmse.σ.isNormal ) && rmse.σ < 1e-3 )
+		print(rmse)
 	}
 }
 extension MTLBuffer {

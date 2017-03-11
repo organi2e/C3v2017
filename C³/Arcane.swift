@@ -11,69 +11,73 @@ import Adapter
 import Optimizer
 
 public class Arcane: NSManagedObject {
-	var μ: Buffer!
-	var σ: Buffer!
-	var Δμ: Buffer!
-	var Δσ: Buffer!
-	var logμ: Buffer!
-	var logσ: Buffer!
-	var μoptimizer: Optimizer!
-	var σoptimizer: Optimizer!
-	var μadapter: Adapter!
-	var σadapter: Adapter!
+	struct Structs {
+		let φ: Buffer
+		let θ: Buffer
+		let Δ: Buffer
+		let adapter: Adapter
+		let optimizer: Optimizer
+		func refresh(commandBuffer: CommandBuffer) {
+			adapter.generate(commandBuffer: commandBuffer, θ: θ, φ: φ)
+		}
+		func reset(commandBuffer: CommandBuffer) {
+			optimizer.reset(commandBuffer: commandBuffer)
+		}
+		func update(commandBuffer: CommandBuffer) {
+			adapter.gradient(commandBuffer: commandBuffer, Δ: Δ, θ: θ, φ: φ)
+			optimizer.optimize(commandBuffer: commandBuffer, θ: φ, Δ: Δ)
+		}
+		var data: Data {
+			return Data(bytesNoCopy: φ.contents(), count: φ.length, deallocator: .none)
+		}
+	}
+	var μ: Structs!
+	var σ: Structs!
 }
 extension Arcane {
 	private static let locationkey: String = "location"
 	private static let logscalekey: String = "logscale"
 	internal func update(commandBuffer: CommandBuffer) {
-		let count: Int = min(location.count, logscale.count) / MemoryLayout<Float>.size
-		func willChange(_: CommandBuffer) {
+		func will( _: CommandBuffer ) {
 			willChangeValue(forKey: Arcane.locationkey)
 			willChangeValue(forKey: Arcane.logscalekey)
 		}
-		func didChange(_: CommandBuffer) {
+		func done( _: CommandBuffer ) {
 			didChangeValue(forKey: Arcane.locationkey)
 			didChangeValue(forKey: Arcane.logscalekey)
 		}
-		commandBuffer.addScheduledHandler(willChange)
+		commandBuffer.addScheduledHandler(will)
 		
-		μadapter.gradient(commandBuffer: commandBuffer, Δ: Δμ, θ: μ, φ: logμ)
-		σadapter.gradient(commandBuffer: commandBuffer, Δ: Δσ, θ: σ, φ: logσ)
+		μ.update(commandBuffer: commandBuffer)
+		σ.update(commandBuffer: commandBuffer)
 		
-		μoptimizer.optimize(commandBuffer: commandBuffer, θ: logμ, Δ: Δμ)
-		σoptimizer.optimize(commandBuffer: commandBuffer, θ: logσ, Δ: Δσ)
+		commandBuffer.addCompletedHandler(done)
 		
-		commandBuffer.addCompletedHandler(didChange)
 	}
 	internal func refresh(commandBuffer: CommandBuffer) {
-		//context.math.copy(commandBuffer: commandBuffer, target: (μ, 0), source: (logμ, 0), count: min(μ.length, logμ.length))
-		//context.math.exp(commandBuffer: commandBuffer, y: σ, x: logσ, count: min(σ.length, logσ.length)/MemoryLayout<Float>.size)
-		μadapter.generate(commandBuffer: commandBuffer, θ: μ, φ: logμ)
-		σadapter.generate(commandBuffer: commandBuffer, θ: σ, φ: logσ)
+		μ.refresh(commandBuffer: commandBuffer)
+		σ.refresh(commandBuffer: commandBuffer)
 		
 	}
 	internal func setup() {
-		
-		let count: Int = min(location.count, logscale.count) / MemoryLayout<Float>.size
-		
-		μoptimizer = context.make(count: count)
-		σoptimizer = context.make(count: count)
-		
-		μadapter = context.lassoFactory(count)
-		σadapter = context.expFactory(count)
-		
-		μ = context.make(length: location.count, options: .storageModePrivate)
-		σ = context.make(length: logscale.count, options: .storageModePrivate)
-		
-		Δμ = context.make(length: location.count, options: .storageModePrivate)
-		Δσ = context.make(length: logscale.count, options: .storageModePrivate)
-		
-		logμ = context.make(data: location, options: .storageModeShared)
-		logσ = context.make(data: logscale, options: .storageModeShared)
-		
-		setPrimitiveValue(Data(bytesNoCopy: logμ.contents(), count: location.count, deallocator: .none), forKey: Arcane.locationkey)
-		setPrimitiveValue(Data(bytesNoCopy: logσ.contents(), count: logscale.count, deallocator: .none), forKey: Arcane.logscalekey)
-		
+		let commandBuffer: CommandBuffer = context.make()
+		μ = Structs(φ: context.make(data: location, options: .storageModeShared),
+		            θ: context.make(length: location.count, options: .storageModePrivate),
+		            Δ: context.make(length: location.count, options: .storageModePrivate),
+		            adapter: context.linFactory(location.count/MemoryLayout<Float>.size),
+		            optimizer: context.optimizerFactory(location.count/MemoryLayout<Float>.size)
+		)
+		σ = Structs(φ: context.make(data: location, options: .storageModeShared),
+		            θ: context.make(length: location.count, options: .storageModePrivate),
+		            Δ: context.make(length: location.count, options: .storageModePrivate),
+		            adapter: context.expFactory(location.count/MemoryLayout<Float>.size),
+		            optimizer: context.optimizerFactory(location.count/MemoryLayout<Float>.size)
+		)
+		μ.reset(commandBuffer: commandBuffer)
+		σ.reset(commandBuffer: commandBuffer)
+		setPrimitiveValue(μ.data, forKey: Arcane.locationkey)
+		setPrimitiveValue(σ.data, forKey: Arcane.logscalekey)
+		commandBuffer.commit()
 	}
 }
 extension Arcane {
@@ -87,11 +91,11 @@ extension Arcane {
 	}
 }
 extension Arcane {
-	internal var χ: (μ: Buffer, σ: Buffer) {
-		return (μ: μ, σ: σ)
+	internal var θ: (μ: Buffer, σ: Buffer) {
+		return (μ: μ.θ, σ: σ.θ)
 	}
 	internal var Δ: (μ: Buffer, σ: Buffer) {
-		return (μ: Δμ, σ: Δσ)
+		return (μ: μ.Δ, σ: σ.Δ)
 	}
 }
 extension Arcane {
