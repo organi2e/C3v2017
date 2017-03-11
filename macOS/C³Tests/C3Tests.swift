@@ -98,9 +98,9 @@ class C3Tests: XCTestCase {
 	func testContext() {
 		do {
 //			let context: Context = try Context(optimizer: Adam.factory(α: 1e-3))
-			let context: Context = try Context(optimizer: SMORMS3.factory(α: 1e-3))
-			//let context: Context = try Context(optimizer: SGD.factory(η: 1e-1))
-//			context.layout = .storageModeShared
+//			let context: Context = try Context(optimizer: SMORMS3.factory(α: 1e-3))
+			let context: Context = try Context(optimizer: SGD.factory(η: 1e-1))
+			context.layout = .storageModeShared
 			
 			let IS: [[Float]] = [[0,0,0,1], [0,0,1,0], [0,0,1,1], [0,1,0,0]]
 			let OS: [[Float]] = [[0,0,0,1], [0,0,1,0], [0,1,0,0], [1,0,0,0]]

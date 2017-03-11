@@ -52,12 +52,12 @@ extension Arcane {
 		σ.update(commandBuffer: commandBuffer)
 		
 		commandBuffer.addCompletedHandler(done)
-		
+		x.commit()
 	}
 	internal func refresh(commandBuffer: CommandBuffer) {
+		x = context.make()
 		μ.refresh(commandBuffer: commandBuffer)
 		σ.refresh(commandBuffer: commandBuffer)
-		
 	}
 	internal func setup() {
 		let commandBuffer: CommandBuffer = context.make()
